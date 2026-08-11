@@ -1,0 +1,17 @@
+{
+  "name": "skillgap-ai-platform",
+  "version": "3.0.0",
+  "private": true,
+  "description": "SkillGap AI — Unified Recruitment & Career Intelligence SaaS Platform",
+  "scripts": {
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"blue,green\" \"./run_backend.sh\" \"./run_frontend.sh\"",
+    "start": "concurrently -n \"BACKEND,FRONTEND\" -c \"blue,green\" \"./run_backend.sh\" \"./run_frontend.sh\"",
+    "backend": "./run_backend.sh",
+    "frontend": "./run_frontend.sh",
+    "build:frontend": "cd frontend && npm run build",
+    "test:backend": "PYTHONPATH=backend .venv/bin/pytest backend/tests -v"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
