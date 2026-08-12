@@ -111,8 +111,13 @@ class ModelMeta(type(BaseModel)):
     def __getattr__(cls, name: str) -> Any:
         if name.startswith("_") or hasattr(type(BaseModel), name):
             raise AttributeError(f"type object '{cls.__name__}' has no attribute '{name}'")
-        if name in cls.__dict__:
-            return cls.__dict__[name]
+        # Do not return dummy attributes on base SupabaseModel class during child class creation
+        if cls.__name__ == "SupabaseModel":
+            raise AttributeError(f"type object '{cls.__name__}' has no attribute '{name}'")
+        # Return ModelField for valid model fields
+        if hasattr(cls, "model_fields") and name in cls.model_fields:
+            return ModelField(name)
+        # Fallback to ModelField for dynamic query building on concrete classes
         return ModelField(name)
 
 

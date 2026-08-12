@@ -73,10 +73,38 @@ require_admin = require_role([UserRole.ADMIN])
 
 
 def get_embedder(request: Request) -> Optional[SentenceTransformer]:
-    """Retrieve SentenceTransformer model from FastAPI app state."""
+    """Retrieve or lazy-load SentenceTransformer model with single-thread CPU memory constraints."""
+    embedder = getattr(request.app.state, "embedder", None)
+    if embedder is None:
+        try:
+            import os
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+            os.environ["OMP_NUM_THREADS"] = "1"
+            import torch
+            torch.set_num_threads(1)
+            from sentence_transformers import SentenceTransformer
+            embedder = SentenceTransformer(settings.SENTENCE_TRANSFORMER_MODEL, device="cpu")
+            request.app.state.embedder = embedder
+            logger.info("✅ SentenceTransformer lazy-loaded into memory.")
+        except Exception as e:
+            logger.warning(f"Lazy SentenceTransformer load failed: {e}. Fallback to token similarity.")
+            request.app.state.embedder = None
     return getattr(request.app.state, "embedder", None)
 
 
 def get_spacy_nlp(request: Request) -> Optional[spacy.Language]:
-    """Retrieve spaCy NLP instance from FastAPI app state."""
+    """Retrieve or lazy-load spaCy NLP instance."""
+    nlp = getattr(request.app.state, "nlp", None)
+    if nlp is None:
+        try:
+            import spacy
+            try:
+                nlp = spacy.load(settings.SPACY_MODEL_SECONDARY)
+            except Exception:
+                nlp = spacy.load(settings.SPACY_MODEL_PRIMARY)
+            request.app.state.nlp = nlp
+            logger.info("✅ spaCy NLP lazy-loaded into memory.")
+        except Exception as e:
+            logger.warning(f"Lazy spaCy load failed: {e}")
+            request.app.state.nlp = None
     return getattr(request.app.state, "nlp", None)

@@ -11,6 +11,12 @@ services:
         value: 3.12.2
       - key: ENVIRONMENT
         value: production
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: MALLOC_ARENA_MAX
+        value: "2"
+      - key: TOKENIZERS_PARALLELISM
+        value: "false"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY

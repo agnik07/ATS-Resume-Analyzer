@@ -25,42 +25,18 @@ logger = logging.getLogger("skillgap_ai")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager: initialize database and preload NLP/embedding models."""
+    """Application lifespan manager: initialize database with lightweight memory footprint."""
     logger.info(f"Starting {settings.PROJECT_NAME} v{settings.VERSION}...")
 
-    # 1. Initialize MongoDB & Beanie ODM
+    # Initialize Supabase connection
     try:
         await init_db()
     except Exception as e:
         logger.error(f"Database initialization warning: {e}. (Will retry on queries)")
 
-    # 2. Preload SentenceTransformer
-    try:
-        logger.info(f"Loading SentenceTransformer: {settings.SENTENCE_TRANSFORMER_MODEL}...")
-        from sentence_transformers import SentenceTransformer
-        try:
-            app.state.embedder = SentenceTransformer(settings.SENTENCE_TRANSFORMER_MODEL, local_files_only=True)
-        except Exception:
-            app.state.embedder = SentenceTransformer(settings.SENTENCE_TRANSFORMER_MODEL)
-        logger.info("✅ SentenceTransformer loaded.")
-    except Exception as e:
-        logger.warning(f"Failed to load SentenceTransformer: {e}. Embedder set to None.")
-        app.state.embedder = None
-
-    # 3. Preload spaCy NLP
-    try:
-        logger.info(f"Loading spaCy NLP model: {settings.SPACY_MODEL_PRIMARY}...")
-        import spacy
-        try:
-            app.state.nlp = spacy.load(settings.SPACY_MODEL_PRIMARY)
-            logger.info(f"✅ Loaded spaCy {settings.SPACY_MODEL_PRIMARY}.")
-        except Exception:
-            logger.warning(f"Falling back to spaCy {settings.SPACY_MODEL_SECONDARY}...")
-            app.state.nlp = spacy.load(settings.SPACY_MODEL_SECONDARY)
-            logger.info(f"✅ Loaded spaCy {settings.SPACY_MODEL_SECONDARY}.")
-    except Exception as e:
-        logger.warning(f"Failed to load spaCy: {e}. NLP set to None.")
-        app.state.nlp = None
+    # Initialize state slots for lazy model loading
+    app.state.embedder = None
+    app.state.nlp = None
 
     logger.info("🚀 Platform API is ready to serve requests.")
     yield
