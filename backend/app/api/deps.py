@@ -82,11 +82,14 @@ def get_embedder(request: Request) -> Optional[Any]:
             import torch
             torch.set_num_threads(1)
             from sentence_transformers import SentenceTransformer
-            embedder = SentenceTransformer(settings.SENTENCE_TRANSFORMER_MODEL, device="cpu")
+            try:
+                embedder = SentenceTransformer(settings.SENTENCE_TRANSFORMER_MODEL, device="cpu", local_files_only=True)
+            except Exception:
+                embedder = SentenceTransformer(settings.SENTENCE_TRANSFORMER_MODEL, device="cpu")
             request.app.state.embedder = embedder
             logger.info("✅ SentenceTransformer lazy-loaded into memory.")
         except Exception as e:
-            logger.warning(f"Lazy SentenceTransformer load failed: {e}. Fallback to token similarity.")
+            logger.warning(f"Lazy SentenceTransformer load failed: {e}. Fallback to deterministic token matching.")
             request.app.state.embedder = None
     return getattr(request.app.state, "embedder", None)
 

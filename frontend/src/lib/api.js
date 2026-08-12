@@ -10,12 +10,16 @@ const api = axios.create({
   },
 });
 
-// Request interceptor: attach access token
+// Request interceptor: attach access token & handle FormData boundary
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    // Delete Content-Type for FormData so browser sets correct boundary
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
     }
     return config;
   },

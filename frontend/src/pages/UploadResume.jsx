@@ -60,9 +60,7 @@ export default function UploadResume() {
     }
 
     try {
-      const res = await api.post('/ats/upload-and-analyze', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const res = await api.post('/ats/upload-and-analyze', formData);
       setAnalysisResult(res.data);
       toast.success('Resume analyzed successfully!');
     } catch (err) {
