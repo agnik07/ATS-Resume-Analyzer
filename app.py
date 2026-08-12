@@ -10,7 +10,6 @@ sys.path.insert(0, str(BACKEND_DIR))
 import gradio as gr
 from app.main import app as fastapi_app
 
-# Create a clean landing page for the Hugging Face Space
 with gr.Blocks(title="SkillGap AI - Platform API") as demo:
     gr.Markdown("""
     # 🚀 SkillGap AI & ATS Resume Scorer — Live Backend API
@@ -23,14 +22,13 @@ with gr.Blocks(title="SkillGap AI - Platform API") as demo:
     - **API Health Check**: [Check Service Status](/health)
 
     ---
-    *Powered by FastAPI, Supabase PostgreSQL, and Groq AI on Hugging Face Spaces (16GB RAM).*
+    *Powered by FastAPI, Supabase PostgreSQL, and Groq AI on Hugging Face Spaces.*
     """)
 
-# Mount the complete FastAPI application onto the Gradio Space
-app = gr.mount_gradio_app(fastapi_app, demo, path="/status")
+# gr.mount_gradio_app attaches Gradio UI to FastAPI
+app = gr.mount_gradio_app(fastapi_app, demo, path="/")
 
-# When run directly by Uvicorn / Space runner
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 7860))
-    uvicorn.run("app:app", host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port)
