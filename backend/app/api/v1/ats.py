@@ -154,7 +154,7 @@ async def upload_and_analyze_resume(
     )
     await report_doc.insert()
 
-    return ATSAnalysisResponse(
+    res_obj = ATSAnalysisResponse(
         id=str(report_doc.id),
         resume_id=str(resume_doc.id),
         filename=filename,
@@ -183,6 +183,9 @@ async def upload_and_analyze_resume(
         extracted_skills=skills,
         created_at=report_doc.created_at,
     )
+    import gc
+    gc.collect()
+    return res_obj
 
 
 @router.get("/reports", response_model=List[ATSReportListItem])

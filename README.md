@@ -73,34 +73,49 @@ Runs the FastAPI Backend on `http://localhost:8000` and the React Frontend on `h
 PYTHONPATH=backend .venv/bin/pytest backend/tests -v
 ```
 
----
+### 4. Running with Docker Compose (Local Deployment)
+```bash
+# Build and run both backend & frontend containers
+docker compose up --build
 
-## 🌐 Public Cloud Deployment Guide (Vercel + Render + Supabase)
-
-### Step 1: Database Setup on **Supabase**
-1. Create a project at [supabase.com](https://supabase.com).
-2. Go to **SQL Editor** -> **New Query**, paste [backend/supabase_schema.sql](file:///Users/agnikdutta/Documents/CODING/AI%20ATS%20Scorer/backend/supabase_schema.sql), and click **Run**.
-3. Go to **Project Settings** -> **API**, and copy:
-   - `Project URL`
-   - `anon / public key` or `service_role key`
+# Backend runs on http://localhost:8000
+# Frontend runs on http://localhost:3000
+```
 
 ---
 
-### Step 2: Backend Deployment on **Render** (Native Python Web Service)
+## 🌐 Cloud Deployment Options
+
+### Option A: **Hugging Face Spaces** (Recommended for ML/AI — 16GB RAM FREE)
+Hugging Face Spaces provides **16GB RAM + 2 vCPUs completely FREE forever** (32x more RAM than Render Free tier, perfectly suited for PyTorch/Transformers!).
+
+1. Go to [huggingface.co/spaces](https://huggingface.co/spaces) and click **Create new Space**.
+2. Settings:
+   - **Space Name**: `ats-resume-backend`
+   - **License**: `mit`
+   - **Space SDK**: **Docker** (Blank)
+   - **Hardware**: **CPU basic (2 vCPU · 16 GB RAM) · Free**
+3. Create a `.env` in Spaces Settings or push the repo directly.
+4. Set Space Variables/Secrets:
+   - `SUPABASE_URL`: `https://your-project.supabase.co`
+   - `SUPABASE_KEY`: `your_supabase_key`
+   - `GROQ_API_KEY`: `your_groq_api_key`
+   - `JWT_SECRET_KEY`: `your_secret_key`
+5. Connect your GitHub repository or push using git.
+6. Your backend API URL will be: `https://<your-username>-ats-resume-backend.hf.space`.
+
+---
+
+### Option B: Backend on **Render** (512MB RAM Free)
 1. Push your repository to GitHub.
 2. In [Render Dashboard](https://dashboard.render.com), click **New +** -> **Web Service**.
 3. Connect your repository. Render will automatically detect the [render.yaml](file:///Users/agnikdutta/Documents/CODING/AI%20ATS%20Scorer/render.yaml) Blueprint!
-4. Or configure manually:
-   - **Environment**: `Python 3`
-   - **Root Directory**: `backend`
-   - **Build Command**: `pip install -r requirements.txt && python -m spacy download en_core_web_sm`
-   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-5. Set Environment Variables in Render:
+4. Set Environment Variables in Render:
    - `SUPABASE_URL`: `https://your-project.supabase.co`
    - `SUPABASE_KEY`: `your_supabase_key`
    - `JWT_SECRET_KEY`: `generate_a_random_32_byte_string`
    - `GROQ_API_KEY`: `your_groq_api_key` (from [console.groq.com](https://console.groq.com))
-6. Click **Deploy Web Service**. Copy your live backend URL (e.g. `https://skillgap-backend.onrender.com`).
+5. Click **Deploy Web Service**.
 
 ---
 
@@ -113,7 +128,7 @@ PYTHONPATH=backend .venv/bin/pytest backend/tests -v
    - **Build Command**: `npm run build`
    - **Output Directory**: `dist`
 4. Add Environment Variable in Vercel:
-   - `VITE_BACKEND_URL`: `https://skillgap-backend.onrender.com` (Your deployed Render backend URL)
+   - `VITE_BACKEND_URL`: `https://ats-resume-analyzer-3j8p.onrender.com` (or your HuggingFace Spaces URL)
 5. Click **Deploy**. Your app is live with global CDN edge performance and SSL!
 
 ---
