@@ -2,7 +2,6 @@ import re
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from app.services.skill_taxonomy import fuzzy_match_keywords, normalize_skill
 
 logger = logging.getLogger(__name__)
@@ -57,7 +56,7 @@ def detect_location_info(text: str) -> Dict[str, Any]:
     }
 
 
-def _calculate_semantic_similarity(skill: str, text: str, embedder: Optional[SentenceTransformer]) -> float:
+def _calculate_semantic_similarity(skill: str, text: str, embedder: Optional[Any]) -> float:
     """Compute cosine similarity between skill and project/experience text."""
     if not skill or not text:
         return 0.0
@@ -80,7 +79,7 @@ def validate_skills_with_projects(
     skills: List[str],
     projects: List[Dict],
     experience_entries: List[Dict],
-    embedder: Optional[SentenceTransformer],
+    embedder: Optional[Any],
     threshold: float = 0.55,
 ) -> Dict[str, Any]:
     """

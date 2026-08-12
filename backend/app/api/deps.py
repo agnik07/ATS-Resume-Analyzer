@@ -1,9 +1,8 @@
 import logging
-from typing import Optional
+from typing import Any, Optional
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sentence_transformers import SentenceTransformer
-import spacy
+from app.core.config import settings
 from app.core.security import decode_token
 from app.models.user import User, UserRole
 
@@ -72,7 +71,7 @@ require_recruiter = require_role([UserRole.RECRUITER])
 require_admin = require_role([UserRole.ADMIN])
 
 
-def get_embedder(request: Request) -> Optional[SentenceTransformer]:
+def get_embedder(request: Request) -> Optional[Any]:
     """Retrieve or lazy-load SentenceTransformer model with single-thread CPU memory constraints."""
     embedder = getattr(request.app.state, "embedder", None)
     if embedder is None:
@@ -92,7 +91,7 @@ def get_embedder(request: Request) -> Optional[SentenceTransformer]:
     return getattr(request.app.state, "embedder", None)
 
 
-def get_spacy_nlp(request: Request) -> Optional[spacy.Language]:
+def get_spacy_nlp(request: Request) -> Optional[Any]:
     """Retrieve or lazy-load spaCy NLP instance."""
     nlp = getattr(request.app.state, "nlp", None)
     if nlp is None:

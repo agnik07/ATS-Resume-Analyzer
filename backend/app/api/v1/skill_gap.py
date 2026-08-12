@@ -1,6 +1,5 @@
-from typing import List, Optional
+from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from sentence_transformers import SentenceTransformer
 from app.api.deps import get_current_user, get_embedder
 from app.models.user import User
 from app.models.resume import Resume
@@ -17,7 +16,7 @@ router = APIRouter(prefix="/skill-gap", tags=["Skill Gap Engine"])
 async def perform_skill_gap_analysis(
     req: SkillGapAnalysisRequest,
     current_user: User = Depends(get_current_user),
-    embedder: Optional[SentenceTransformer] = Depends(get_embedder),
+    embedder: Optional[Any] = Depends(get_embedder),
 ):
     """
     Perform deep skill gap analysis:

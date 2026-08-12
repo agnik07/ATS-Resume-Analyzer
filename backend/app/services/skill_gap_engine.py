@@ -1,7 +1,6 @@
 import logging
 from typing import Any, Dict, List, Optional
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from app.services.skill_taxonomy import fuzzy_match_keywords, normalize_skill
 from app.services.learning_resources import build_rule_based_roadmap, get_learning_resources
 from app.services.groq_service import parse_job_description
@@ -12,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_semantic_similarity(
-    text1: str, text2: str, embedder: Optional[SentenceTransformer]
+    text1: str, text2: str, embedder: Optional[Any]
 ) -> float:
     """Compute cosine similarity between two text snippets using sentence embeddings."""
     if not text1 or not text2:
@@ -36,7 +35,7 @@ def analyze_skill_gap(
     target_company: str,
     target_role: str,
     job_description_text: Optional[str] = None,
-    embedder: Optional[SentenceTransformer] = None,
+    embedder: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Perform deep skill gap analysis between pre-parsed candidate resume and target role.

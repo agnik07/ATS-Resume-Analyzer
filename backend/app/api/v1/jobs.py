@@ -1,6 +1,5 @@
-from typing import List, Optional
+from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sentence_transformers import SentenceTransformer
 from app.api.deps import get_current_user, get_embedder, require_student
 from app.models.user import User
 from app.models.job import Job
@@ -101,7 +100,7 @@ async def apply_for_job(
     job_id: str,
     req: ApplicationCreateRequest,
     current_user: User = Depends(require_student),
-    embedder: Optional[SentenceTransformer] = Depends(get_embedder),
+    embedder: Optional[Any] = Depends(get_embedder),
 ):
     """
     Student job application endpoint:

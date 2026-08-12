@@ -1,7 +1,6 @@
 import logging
-from typing import List, Optional
+from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
-from sentence_transformers import SentenceTransformer
 from app.api.deps import get_current_user, get_embedder
 from app.models.user import User
 from app.models.resume import Resume
@@ -28,7 +27,7 @@ async def upload_and_analyze_resume(
     file: UploadFile = File(...),
     job_description: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user),
-    embedder: Optional[SentenceTransformer] = Depends(get_embedder),
+    embedder: Optional[Any] = Depends(get_embedder),
 ):
     """
     Unified Resume Analysis Pipeline:
