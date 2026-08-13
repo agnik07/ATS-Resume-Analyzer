@@ -27,8 +27,8 @@ with gr.Blocks(title="SkillGap AI - Platform API") as demo:
     *Powered by FastAPI, Supabase PostgreSQL, and Groq AI on Hugging Face Spaces (16GB RAM).*
     """)
 
-# Mount the Gradio demo interface onto FastAPI
-app = gr.mount_gradio_app(fastapi_app, demo, path="/")
+# Mount the Gradio demo interface at /status so FastAPI controls root and API routes
+app = gr.mount_gradio_app(fastapi_app, demo, path="/status")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
