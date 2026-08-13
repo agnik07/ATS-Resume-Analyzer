@@ -8,6 +8,7 @@ BACKEND_DIR = ROOT_DIR / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
 
 import gradio as gr
+import uvicorn
 from app.main import app as fastapi_app
 
 # Create clean Gradio landing page
@@ -28,3 +29,7 @@ with gr.Blocks(title="SkillGap AI - Platform API") as demo:
 
 # Mount the Gradio demo interface onto FastAPI
 app = gr.mount_gradio_app(fastapi_app, demo, path="/")
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 7860))
+    uvicorn.run(app, host="0.0.0.0", port=port)
