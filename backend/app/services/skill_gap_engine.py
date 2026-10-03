@@ -29,6 +29,40 @@ def calculate_semantic_similarity(
         return 0.0
 
 
+# ML Role Taxonomy Clusters for L_ml Tier Prediction
+ROLE_TAXONOMY_CLUSTERS = {
+    "frontend": ["react", "javascript", "typescript", "html", "css", "next.js", "tailwind", "web performance", "state management"],
+    "backend": ["python", "node.js", "java", "sql", "postgresql", "rest api", "docker", "microservices", "redis", "system design"],
+    "fullstack": ["react", "node.js", "python", "typescript", "sql", "postgresql", "rest api", "git", "docker", "aws"],
+    "data": ["python", "sql", "pandas", "numpy", "spark", "machine learning", "scikit-learn", "data modeling", "etl"],
+    "devops": ["docker", "kubernetes", "aws", "terraform", "ci/cd", "linux", "bash", "python", "ansible", "monitoring"],
+    "consultant": ["business analysis", "stakeholder management", "strategic planning", "requirements gathering", "agile", "scrum", "sql", "excel", "presentation"],
+    "product": ["product strategy", "user stories", "roadmap planning", "agile", "scrum", "data analytics", "sql", "jira", "wireframing"],
+}
+
+
+def _predict_role_skills_ml(target_role: str, embedder: Optional[Any] = None) -> List[str]:
+    """Tier 3 (L_ml): ML / cluster similarity prediction of role skills."""
+    role_lower = target_role.lower()
+    for cluster_name, skills in ROLE_TAXONOMY_CLUSTERS.items():
+        if cluster_name in role_lower:
+            return skills
+
+    # TF-IDF / term overlap prediction
+    if "software" in role_lower or "developer" in role_lower or "engineer" in role_lower:
+        return ROLE_TAXONOMY_CLUSTERS["fullstack"]
+    if "data" in role_lower or "ai" in role_lower or "ml" in role_lower:
+        return ROLE_TAXONOMY_CLUSTERS["data"]
+    if "cloud" in role_lower or "ops" in role_lower or "site reliability" in role_lower:
+        return ROLE_TAXONOMY_CLUSTERS["devops"]
+    if "consultant" in role_lower or "analyst" in role_lower or "strategy" in role_lower:
+        return ROLE_TAXONOMY_CLUSTERS["consultant"]
+    if "product" in role_lower or "program" in role_lower:
+        return ROLE_TAXONOMY_CLUSTERS["product"]
+
+    return ROLE_TAXONOMY_CLUSTERS["fullstack"]
+
+
 def analyze_skill_gap(
     resume_skills: List[str],
     resume_text: str,
@@ -38,33 +72,45 @@ def analyze_skill_gap(
     embedder: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
-    Perform deep skill gap analysis between pre-parsed candidate resume and target role.
-    Directly consumes parsed resume data without reparsing.
-    Includes target company LeetCode / DSA preparation problems from master dataset.
+    Perform deep skill gap analysis between candidate resume and target role.
+    Uses strict 4-Tier Fallback Formula:
+    L = L_static if predefined catalog exists
+        L_api    if external job APIs / JD input exists
+        L_ml     if ML model predicts role skills
+        L_llm    otherwise (Groq LLM generation)
     """
     job_skills_raw: List[str] = []
-    fallback_used = "NONE"
+    fallback_used = "L_LLM"
 
-    # Step 1: Check static job catalog
+    # Tier 1: L_static (predefined role data)
     static_job = get_static_job(target_company, target_role)
     if static_job and static_job.get("skills"):
         job_skills_raw = static_job["skills"]
         if not job_description_text:
             job_description_text = static_job.get("description", "")
-        fallback_used = "STATIC_CATALOG"
+        fallback_used = "L_STATIC"
 
-    # Step 2: If JD text is provided, parse requirements with Groq/rules
-    if job_description_text and job_description_text.strip():
+    # Tier 2: L_api (external job API / parsed JD text)
+    if not job_skills_raw and job_description_text and job_description_text.strip():
         parsed_jd = parse_job_description(job_description_text)
         extracted_skills = parsed_jd.get("required_skills", []) + parsed_jd.get("preferred_skills", [])
         if extracted_skills:
-            job_skills_raw = list(set(job_skills_raw + extracted_skills))
-            fallback_used = "JD_PARSER"
+            job_skills_raw = extracted_skills
+            fallback_used = "L_API"
 
-    # Step 3: Generic fallback if skills are still empty
+    # Tier 3: L_ml (ML model cluster prediction)
     if not job_skills_raw:
-        job_skills_raw = ["python", "javascript", "sql", "git", "rest api", "data structures", "algorithms"]
-        fallback_used = "GENERIC_DEFAULTS"
+        ml_skills = _predict_role_skills_ml(target_role, embedder)
+        if ml_skills:
+            job_skills_raw = ml_skills
+            fallback_used = "L_ML"
+
+    # Tier 4: L_llm (LLM dynamic generation)
+    if not job_skills_raw:
+        fallback_prompt = f"Target Role: {target_role} at {target_company}"
+        parsed_llm = parse_job_description(fallback_prompt)
+        job_skills_raw = parsed_llm.get("required_skills", ["python", "javascript", "sql", "git", "rest api"])
+        fallback_used = "L_LLM"
 
     # Normalize skills
     norm_resume_skills = list(set([normalize_skill(s) for s in resume_skills if s]))

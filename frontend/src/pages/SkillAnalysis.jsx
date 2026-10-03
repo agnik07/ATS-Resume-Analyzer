@@ -30,6 +30,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
+import { getScoreColorClass, getScoreFillHex } from '../lib/scoreUtils';
 
 export default function SkillAnalysis() {
   const [company, setCompany] = useState('');
@@ -210,12 +211,21 @@ export default function SkillAnalysis() {
                 <span className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">
                   Skill Match Score
                 </span>
-                <div className="text-5xl font-black font-mono text-primary my-2">
+                <div className={`text-5xl font-black font-mono my-2 ${getScoreColorClass(analysis.match_percentage)}`}>
                   {analysis.match_percentage}%
                 </div>
-                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-primary/10 text-primary">
-                  {analysis.confidence_level} Match Confidence
-                </span>
+                <div className="flex flex-wrap gap-1.5 justify-center mt-1">
+                  <span className="text-xs font-semibold px-3 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                    {analysis.confidence_level} Match Confidence
+                  </span>
+                  {analysis.fallback_used && (
+                    <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                      {analysis.fallback_used === 'L_STATIC' ? 'L_static (Predefined Catalog)' :
+                       analysis.fallback_used === 'L_API' ? 'L_api (External Job API)' :
+                       analysis.fallback_used === 'L_ML' ? 'L_ml (ML Taxonomy Prediction)' : 'L_llm (LLM Generation)'}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="lg:col-span-2 p-6 rounded-2xl border border-border bg-card flex flex-col justify-between">
@@ -223,17 +233,17 @@ export default function SkillAnalysis() {
                 <ResponsiveContainer width="100%" height={140}>
                   <BarChart
                     data={[
-                      { name: 'Matched Skills', count: analysis.matched_skills.length, fill: '#10b981' },
-                      { name: 'Missing Skills', count: analysis.missing_skills.length, fill: '#f43f5e' },
+                      { name: 'Matched Skills', count: analysis.matched_skills.length, fill: getScoreFillHex(80) },
+                      { name: 'Missing Skills', count: analysis.missing_skills.length, fill: getScoreFillHex(20) },
                     ]}
                     layout="vertical"
                   >
                     <XAxis type="number" hide />
                     <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 12 }} />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '8px' }} />
+                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '8px', border: '1px solid hsl(var(--border))' }} />
                     <Bar dataKey="count" radius={[0, 6, 6, 0]}>
-                      <Cell fill="#10b981" />
-                      <Cell fill="#f43f5e" />
+                      <Cell fill={getScoreFillHex(80)} />
+                      <Cell fill={getScoreFillHex(20)} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -245,14 +255,14 @@ export default function SkillAnalysis() {
               {/* Matched */}
               <div className="p-6 rounded-2xl border border-border bg-card">
                 <h4 className="font-bold text-foreground flex items-center gap-2 mb-4">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  <CheckCircle2 className="h-5 w-5 text-primary" />
                   Matched Competencies ({analysis.matched_skills.length})
                 </h4>
                 <div className="flex flex-wrap gap-2">
                   {analysis.matched_skills.map((s, idx) => (
                     <span
                       key={idx}
-                      className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-lg text-xs font-semibold"
+                      className="px-3 py-1 bg-primary/10 border border-primary/20 text-primary rounded-lg text-xs font-semibold"
                     >
                       {s}
                     </span>
@@ -263,7 +273,7 @@ export default function SkillAnalysis() {
               {/* Missing */}
               <div className="p-6 rounded-2xl border border-border bg-card">
                 <h4 className="font-bold text-foreground flex items-center gap-2 mb-4">
-                  <XCircle className="h-5 w-5 text-rose-500" />
+                  <XCircle className="h-5 w-5 text-[#993C1D] dark:text-[#F0997B]" />
                   Missing Required Skills ({analysis.missing_skills.length})
                 </h4>
                 <div className="flex flex-wrap gap-2">
@@ -271,7 +281,7 @@ export default function SkillAnalysis() {
                     analysis.missing_skills.map((s, idx) => (
                       <span
                         key={idx}
-                        className="px-3 py-1 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-lg text-xs font-semibold"
+                        className="px-3 py-1 bg-[#993C1D]/10 dark:bg-[#F0997B]/15 border border-[#993C1D]/20 dark:border-[#F0997B]/30 text-[#993C1D] dark:text-[#F0997B] rounded-lg text-xs font-semibold"
                       >
                         {s}
                       </span>
@@ -335,7 +345,7 @@ export default function SkillAnalysis() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-amber-400" />
+                      <Sparkles className="h-5 w-5 text-primary" />
                       Target Company DSA Interview Bank ({analysis.target_company})
                     </h3>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -356,10 +366,10 @@ export default function SkillAnalysis() {
                   {analysis.company_dsa_problems.map((prob) => {
                     const diffColor =
                       prob.difficulty === 'Easy'
-                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                        ? 'bg-[#0F6E56]/10 text-[#0F6E56] border-[#0F6E56]/20 dark:bg-[#5DCAA5]/15 dark:text-[#5DCAA5] dark:border-[#5DCAA5]/30'
                         : prob.difficulty === 'Medium'
-                        ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                        : 'bg-rose-500/10 text-rose-500 border-rose-500/20';
+                        ? 'bg-[#BA7517]/10 text-[#BA7517] border-[#BA7517]/20 dark:bg-[#EF9F27]/15 dark:text-[#EF9F27] dark:border-[#EF9F27]/30'
+                        : 'bg-[#993C1D]/10 text-[#993C1D] border-[#993C1D]/20 dark:bg-[#F0997B]/15 dark:text-[#F0997B] dark:border-[#F0997B]/30';
 
                     return (
                       <a

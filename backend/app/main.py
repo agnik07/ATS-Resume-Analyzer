@@ -10,6 +10,7 @@ from app.api.v1 import (
     ats_router,
     auth_router,
     career_router,
+    github_router,
     jobs_router,
     recruiter_router,
     skill_gap_router,
@@ -54,11 +55,13 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS configuration: allow Vercel production & preview domains, localhost, and custom origins
+# CORS configuration: allow frontend ports (3000, 3001, etc.) and allow_credentials
+cors_origins = [o for o in settings.BACKEND_CORS_ORIGINS if o != "*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_origin_regex=r".*",
+    allow_origins=cors_origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -75,6 +78,7 @@ app.include_router(student_router, prefix=api_v1_prefix)
 app.include_router(recruiter_router, prefix=api_v1_prefix)
 app.include_router(career_router, prefix=api_v1_prefix)
 app.include_router(admin_router, prefix=api_v1_prefix)
+app.include_router(github_router, prefix=api_v1_prefix)
 
 # Mount local uploads directory if it exists
 settings.LOCAL_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

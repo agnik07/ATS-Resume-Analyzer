@@ -3,7 +3,7 @@
 set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-cd "$DIR"
+cd "$DIR/backend"
 
 echo "=========================================================="
 echo "🚀 Starting SkillGap AI Unified Backend on http://localhost:8000"

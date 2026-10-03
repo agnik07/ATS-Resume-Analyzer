@@ -24,6 +24,7 @@ import {
   Tag,
   HelpCircle,
 } from 'lucide-react';
+import { getScoreColorClass, getScoreBgClass } from '../../lib/scoreUtils';
 
 export default function CandidateSearch() {
   const { jobId } = useParams();
@@ -117,13 +118,6 @@ export default function CandidateSearch() {
     }
   };
 
-  const getScoreColor = (score) => {
-    if (score >= 85) return 'text-emerald-500';
-    if (score >= 70) return 'text-blue-500';
-    if (score >= 55) return 'text-amber-500';
-    return 'text-rose-500';
-  };
-
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <Navbar />
@@ -189,7 +183,7 @@ export default function CandidateSearch() {
         {/* Candidates Table */}
         {loading ? (
           <div className="py-16 text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-xs text-muted-foreground mt-2">Loading and ranking candidate pool...</p>
           </div>
         ) : candidates.length > 0 ? (
@@ -214,17 +208,17 @@ export default function CandidateSearch() {
                       <td className="p-4 font-bold text-foreground">{c.student_name}</td>
                       <td className="p-4 text-xs text-muted-foreground">{c.student_email}</td>
                       <td className="p-4 font-mono font-bold">
-                        <span className={`text-base ${getScoreColor(c.ats_score)}`}>{c.ats_score}/100</span>
+                        <span className={`text-base ${getScoreColorClass(c.ats_score)}`}>{c.ats_score}/100</span>
                       </td>
                       <td className="p-4 font-mono font-bold text-primary">{c.match_percentage}%</td>
                       <td className="p-4">
                         <span
-                          className={`text-xs font-semibold px-2.5 py-1 rounded-full uppercase ${
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-full uppercase border ${
                             c.status === 'shortlisted' || c.status === 'offered'
-                              ? 'bg-emerald-500/10 text-emerald-500'
+                              ? 'bg-[#0F6E56]/10 text-[#0F6E56] border-[#0F6E56]/20 dark:bg-[#5DCAA5]/15 dark:text-[#5DCAA5] dark:border-[#5DCAA5]/30'
                               : c.status === 'rejected'
-                              ? 'bg-rose-500/10 text-rose-500'
-                              : 'bg-blue-500/10 text-blue-500'
+                              ? 'bg-[#993C1D]/10 text-[#993C1D] border-[#993C1D]/20 dark:bg-[#F0997B]/15 dark:text-[#F0997B] dark:border-[#F0997B]/30'
+                              : 'bg-muted text-muted-foreground border-border'
                           }`}
                         >
                           {c.status}
@@ -279,7 +273,7 @@ export default function CandidateSearch() {
                   <div className="p-4 rounded-xl border border-border bg-background/50 flex justify-between items-center">
                     <div>
                       <span className="text-[10px] uppercase font-semibold text-muted-foreground">ATS Score</span>
-                      <div className={`text-3xl font-black font-mono ${getScoreColor(candidateDetails.ats_score)}`}>
+                      <div className={`text-3xl font-black font-mono ${getScoreColorClass(candidateDetails.ats_score)}`}>
                         {candidateDetails.ats_score}/100
                       </div>
                     </div>

@@ -82,13 +82,13 @@ export default function AdminDashboard() {
 
           <div className="p-6 rounded-2xl border border-border bg-card">
             <span className="text-xs uppercase font-semibold text-muted-foreground">Published Jobs</span>
-            <div className="text-3xl font-black font-mono mt-1 text-blue-500">{stats?.total_jobs_posted ?? 0}</div>
+            <div className="text-3xl font-black font-mono mt-1 text-foreground">{stats?.total_jobs_posted ?? 0}</div>
             <span className="text-xs text-muted-foreground mt-2 block">Active employer postings</span>
           </div>
 
           <div className="p-6 rounded-2xl border border-border bg-card">
             <span className="text-xs uppercase font-semibold text-muted-foreground">Total Applications</span>
-            <div className="text-3xl font-black font-mono mt-1 text-emerald-500">{stats?.total_applications ?? 0}</div>
+            <div className="text-3xl font-black font-mono mt-1 text-primary">{stats?.total_applications ?? 0}</div>
             <span className="text-xs text-muted-foreground mt-2 block">Submitted to pipelines</span>
           </div>
         </div>

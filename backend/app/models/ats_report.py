@@ -26,6 +26,9 @@ class ATSReport(SupabaseModel):
     skill_validation_details: Dict[str, Any] = Field(default_factory=dict)
     penalties: Dict[str, float] = Field(default_factory=dict)
     bonuses: Dict[str, float] = Field(default_factory=dict)
+    github_evidence_score: Optional[float] = 0.0
+    enhanced_ats_score: Optional[float] = 0.0
+    github_evidence: Optional[Dict[str, Any]] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @field_validator("user_id", "resume_id", mode="before")

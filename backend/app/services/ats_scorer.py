@@ -109,16 +109,33 @@ def validate_skills_with_projects(
         matching_projects = []
         max_similarity = 0.0
 
-        # Fast check: substring match
         skill_lower = skill.lower()
+
+        # Build list of search variants for skill (e.g., node.js -> node, js -> javascript, etl -> etl pipeline)
+        search_variants = {skill_lower, raw_skill.lower()}
+        if skill_lower in {"node.js", "nodejs"}:
+            search_variants.update({"node.js", "node", "express"})
+        elif skill_lower in {"react", "react.js"}:
+            search_variants.update({"react", "react.js", "reactjs"})
+        elif skill_lower in {"fastapi"}:
+            search_variants.update({"fastapi", "fast api"})
+        elif skill_lower in {"oop", "object-oriented programming"}:
+            search_variants.update({"oop", "object-oriented", "object oriented"})
+        elif skill_lower in {"nlp", "natural language processing"}:
+            search_variants.update({"nlp", "natural language", "llm", "llms"})
+        elif skill_lower in {"etl"}:
+            search_variants.update({"etl", "data migration", "pipeline", "pipelines"})
+        elif skill_lower in {"dsa", "data structures", "algorithms"}:
+            search_variants.update({"data structures", "algorithms", "dsa", "leetcode"})
 
         # Check projects
         for proj in projects:
             if not isinstance(proj, dict):
                 continue
             proj_title = proj.get("title", "Project")
-            proj_desc = f"{proj.get('title', '')} {proj.get('description', '')} {' '.join(proj.get('technologies', []))}"
-            if skill_lower in proj_desc.lower():
+            proj_desc = f"{proj.get('title', '')} {proj.get('description', '')} {' '.join(proj.get('technologies', []))}".lower()
+
+            if any(v in proj_desc for v in search_variants):
                 matching_projects.append(proj_title)
                 max_similarity = 1.0
             elif embedder:
@@ -129,7 +146,8 @@ def validate_skills_with_projects(
 
         # Check experience
         if exp_text:
-            if skill_lower in exp_text.lower():
+            exp_text_lower = exp_text.lower()
+            if any(v in exp_text_lower for v in search_variants):
                 if "Work Experience" not in matching_projects:
                     matching_projects.append("Work Experience")
                 max_similarity = max(max_similarity, 1.0)
@@ -279,16 +297,23 @@ def calculate_overall_score(
     skill_validation_results: Dict[str, Any],
     location_results: Dict[str, Any],
     jd_keywords: Optional[List[str]] = None,
+    parsed_jd: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    100% Deterministic ATS Score Calculation across 5 key pillars.
+    Multi-dimensional Deterministic ATS Score Calculation with skill evidence points,
+    negative unverified skill penalties, publication/certification bonuses, experience matching,
+    and non-tech/consultant role sensitivity.
     """
+    role_type = (parsed_jd.get("role_type") if parsed_jd else "tech") or "tech"
+    is_non_tech = role_type in ("consultant", "non-tech")
+
     formatting_score = _calc_formatting_score(parsed_resume, text)
     keywords_score = _calc_keywords_score(keywords, skills, jd_keywords)
     content_score = _calc_content_score(text, action_verbs)
     skill_validation_score = skill_validation_results.get("validation_score", 0.0)
     ats_compatibility_score = _calc_ats_compatibility_score(text, location_results, parsed_resume)
 
+    # Base score sum
     raw_sum = (
         formatting_score
         + keywords_score
@@ -300,21 +325,65 @@ def calculate_overall_score(
     bonuses: Dict[str, float] = {}
     penalties: Dict[str, float] = {}
 
-    val_pct = skill_validation_results.get("validation_percentage", 0.0)
-    if val_pct >= 0.85:
-        bonuses["strong_project_evidence"] = 2.0
-        raw_sum += 2.0
+    # 1. Verified Skills Points (+) & Unverified Skills Penalties (-)
+    validated_skills = skill_validation_results.get("validated_skills", [])
+    unvalidated_skills = skill_validation_results.get("unvalidated_skills", [])
 
+    if len(validated_skills) > 0:
+        v_pts = min(8.0, len(validated_skills) * 1.2)
+        bonuses["verified_skills_evidence"] = round(v_pts, 1)
+        raw_sum += v_pts
+
+    if len(unvalidated_skills) > 0 and not is_non_tech:
+        u_pen = min(6.0, len(unvalidated_skills) * 1.0)
+        penalties["unverified_skills_penalty"] = round(u_pen, 1)
+        raw_sum -= u_pen
+
+    # 2. Genuine Experience & Internship JD Match
+    experience_entries = [e for e in parsed_resume.get("experience", []) if isinstance(e, dict)]
+    exp_text = " ".join(f"{e.get('job_title', '')} {e.get('description', '')}" for e in experience_entries).lower()
+
+    if jd_keywords and len(jd_keywords) > 0 and exp_text:
+        matched_exp_keywords = [k for k in jd_keywords if k.lower() in exp_text]
+        exp_match_ratio = len(matched_exp_keywords) / len(jd_keywords)
+        if exp_match_ratio >= 0.35:
+            e_pts = 5.0 if is_non_tech else 3.5
+            bonuses["genuine_jd_experience_match"] = round(e_pts, 1)
+            raw_sum += e_pts
+        elif exp_match_ratio < 0.15:
+            penalties["low_experience_jd_relevance"] = 2.5
+            raw_sum -= 2.5
+    elif not experience_entries and is_non_tech:
+        penalties["missing_relevant_work_experience"] = 5.0
+        raw_sum -= 5.0
+
+    # 3. Publications & Certifications Bonus
+    publications = parsed_resume.get("publications", [])
+    certifications = parsed_resume.get("certifications", [])
+
+    if len(publications) > 0:
+        pub_pts = min(5.0, len(publications) * 2.5)
+        bonuses["publications_and_research"] = round(pub_pts, 1)
+        raw_sum += pub_pts
+
+    if len(certifications) > 0:
+        req_certs = [c.lower() for c in parsed_jd.get("required_certifications", [])] if parsed_jd else []
+        matched_certs = [c for c in certifications if any(rc in str(c).lower() for rc in req_certs)] if req_certs else certifications
+        cert_pts = min(5.0, len(matched_certs) * 2.5 if req_certs else len(certifications) * 1.5)
+        bonuses["relevant_certifications"] = round(cert_pts, 1)
+        raw_sum += cert_pts
+
+    # 4. JD Keywords Missing Penalty
     if jd_keywords and len(jd_keywords) > 0:
         all_terms = list(set((keywords or []) + (skills or [])))
         res = fuzzy_match_keywords(all_terms, jd_keywords, threshold=80)
         missing_ratio = len(res["missing"]) / len(jd_keywords)
         if missing_ratio > 0.6:
-            penalties["high_missing_jd_keywords"] = 5.0
-            raw_sum -= 5.0
+            penalties["high_missing_jd_keywords"] = 4.0
+            raw_sum -= 4.0
 
     overall_score = min(100.0, max(0.0, raw_sum))
-    interpretation = _generate_interpretation(overall_score)
+    interpretation = _generate_interpretation(overall_score, role_type)
 
     return {
         "overall_score": round(overall_score, 1),
@@ -323,20 +392,26 @@ def calculate_overall_score(
         "content_score": round(content_score, 1),
         "skill_validation_score": round(skill_validation_score, 1),
         "ats_compatibility_score": round(ats_compatibility_score, 1),
+        "role_type": role_type,
         "interpretation": interpretation,
         "penalties": penalties,
         "bonuses": bonuses,
+        "validated_skills_count": len(validated_skills),
+        "unvalidated_skills_count": len(unvalidated_skills),
+        "publications_count": len(publications),
+        "certifications_count": len(certifications),
     }
 
 
-def _generate_interpretation(score: float) -> str:
+def _generate_interpretation(score: float, role_type: str = "tech") -> str:
+    role_suffix = " (Consultant / Management Profile)" if role_type in ("consultant", "non-tech") else ""
     if score >= 88:
-        return "Excellent! Your resume is highly optimized to pass through top-tier enterprise ATS filters."
+        return f"Excellent! Your resume is highly optimized to pass through top-tier enterprise ATS filters{role_suffix}."
     elif score >= 75:
-        return "Great! Your resume demonstrates strong ATS compatibility with minor room for optimization."
+        return f"Great! Your resume demonstrates strong ATS compatibility with minor room for optimization{role_suffix}."
     elif score >= 60:
-        return "Good. Your resume has solid foundations but needs keyword and project evidence improvements."
+        return f"Good. Your resume has solid foundations but needs keyword and project evidence improvements{role_suffix}."
     elif score >= 45:
-        return "Fair. Moderate ATS risk detected. Incorporate measurable achievements and validate claimed skills."
+        return f"Fair. Moderate ATS risk detected. Incorporate measurable achievements and validate claimed skills{role_suffix}."
     else:
-        return "Needs Work. Critical formatting and content issues may cause automatic ATS rejection."
+        return f"Needs Work. Critical formatting and content issues may cause automatic ATS rejection{role_suffix}."

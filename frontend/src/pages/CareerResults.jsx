@@ -68,7 +68,7 @@ export default function CareerResults() {
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="glass-card rounded-2xl p-8 sm:p-12 text-center border border-primary/20 bg-gradient-to-tr from-primary/10 via-blue-500/5 to-background shadow-xl"
+          className="rounded-2xl p-8 sm:p-12 text-center border border-border bg-card shadow-xl"
         >
           <Sparkles className="h-14 w-14 mx-auto mb-4 text-primary" />
           <span className="text-xs uppercase font-bold text-primary tracking-widest">Recommended Career Trajectory</span>
@@ -80,12 +80,12 @@ export default function CareerResults() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="p-6 rounded-2xl border border-border bg-card">
             <h3 className="font-bold text-foreground mb-3 flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+              <CheckCircle2 className="h-5 w-5 text-primary" />
               Core Natural Strengths
             </h3>
             <div className="flex flex-wrap gap-2">
               {latest.strengths?.map((s, idx) => (
-                <span key={idx} className="px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-xs font-semibold">
+                <span key={idx} className="px-3 py-1 bg-primary/10 border border-primary/20 text-primary rounded-lg text-xs font-semibold">
                   {s}
                 </span>
               ))}

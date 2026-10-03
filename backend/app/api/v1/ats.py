@@ -17,6 +17,7 @@ from app.services.feedback_engine import analyze_issues, generate_issues_summary
 from app.services.recommendation_engine import generate_recommendations
 from app.services.storage_service import upload_resume_file
 from app.services.report_service import generate_pdf_report
+from app.services.evidence_engine import run_github_evidence_analysis
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ats", tags=["ATS Intelligence"])
@@ -25,18 +26,20 @@ router = APIRouter(prefix="/ats", tags=["ATS Intelligence"])
 @router.post("/upload-and-analyze", response_model=ATSAnalysisResponse)
 async def upload_and_analyze_resume(
     file: UploadFile = File(...),
+    jd_file: Optional[UploadFile] = File(None),
     job_description: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user),
     embedder: Optional[Any] = Depends(get_embedder),
 ):
     """
     Unified Resume Analysis Pipeline:
-    1. Parse PDF/DOCX text & extract annotations.
-    2. Extract structural sections (Groq LLM with rule fallback).
-    3. Run 5-Pillar deterministic ATS scoring algorithm.
-    4. Validate claimed skills with cosine similarity.
-    5. Generate diagnostic feedback & prioritized recommendations.
-    6. Save Resume and ATSReport to MongoDB via Beanie ODM.
+    1. Parse PDF/DOCX/TXT/MD resume text & annotations.
+    2. Parse optional Job Description document (PDF/DOCX/TXT/MD) or plain text.
+    3. Extract structural sections (Groq LLM with rule fallback).
+    4. Run multi-dimensional deterministic ATS scoring algorithm with points & penalties.
+    5. Validate claimed skills with embeddings & GitHub code cross-checking.
+    6. Generate diagnostic feedback & prioritized recommendations.
+    7. Save Resume and ATSReport to MongoDB via Beanie ODM.
     """
     try:
         file_bytes = await file.read()
@@ -47,6 +50,22 @@ async def upload_and_analyze_resume(
     except Exception as e:
         logger.error(f"Resume text extraction error: {e}")
         raise HTTPException(status_code=400, detail=f"File parsing error: {str(e)}")
+
+    # 1b. Process Job Description from file upload or form text
+    jd_text = ""
+    if jd_file and jd_file.filename:
+        try:
+            jd_bytes = await jd_file.read()
+            jd_parsed_text, _ = parse_resume_file(jd_bytes, jd_file.filename)
+            if jd_parsed_text.strip():
+                jd_text += jd_parsed_text.strip() + "\n"
+        except Exception as e:
+            logger.warning(f"JD file upload extraction failed: {e}")
+
+    if job_description and job_description.strip():
+        jd_text += job_description.strip()
+
+    jd_text = jd_text.strip()
 
     # 2. Structural Parsing
     parsed_data = parse_resume_structure(raw_text)
@@ -67,13 +86,14 @@ async def upload_and_analyze_resume(
         embedder=embedder,
     )
 
-    # 5. Optional JD keywords
+    # 5. Optional JD keywords & structure parsing
     jd_keywords = None
-    if job_description and job_description.strip():
-        parsed_jd = parse_job_description(job_description.strip())
+    parsed_jd = None
+    if jd_text:
+        parsed_jd = parse_job_description(jd_text)
         jd_keywords = list(set(parsed_jd.get("required_skills", []) + parsed_jd.get("keywords", [])))
 
-    # 6. Deterministic 5-Pillar Score
+    # 6. Multi-dimensional Score Calculation
     score_results = calculate_overall_score(
         text=raw_text,
         parsed_resume=parsed_data,
@@ -83,6 +103,7 @@ async def upload_and_analyze_resume(
         skill_validation_results=skill_val_results,
         location_results=location_results,
         jd_keywords=jd_keywords,
+        parsed_jd=parsed_jd,
     )
 
     # 7. Diagnostic feedback & recommendations
@@ -111,6 +132,16 @@ async def upload_and_analyze_resume(
         strengths.append(f"{skill_val_results.get('validation_percentage', 0)*100:.0f}% of listed skills are substantiated by project experience.")
     if not strengths:
         strengths.append("Solid baseline structure ready for targeted metric optimization.")
+
+    # 7b. GitHub Evidence & Development Authenticity Analysis
+    github_res = await run_github_evidence_analysis(
+        raw_resume_text=raw_text,
+        parsed_resume=parsed_data,
+        original_ats_score=score_results["overall_score"],
+        embedder=embedder,
+    )
+    gh_evidence_score = github_res.get("github_evidence_score", 0.0) if github_res.get("is_available") else 0.0
+    enhanced_ats_score = github_res.get("enhanced_ats_score", score_results["overall_score"]) if github_res.get("is_available") else score_results["overall_score"]
 
     # 8. Upload file to Cloudinary / storage
     file_url = upload_resume_file(file_bytes, filename, str(current_user.id))
@@ -151,6 +182,9 @@ async def upload_and_analyze_resume(
         skill_validation_details=skill_val_results,
         penalties=score_results["penalties"],
         bonuses=score_results["bonuses"],
+        github_evidence_score=gh_evidence_score,
+        enhanced_ats_score=enhanced_ats_score,
+        github_evidence=github_res,
     )
     await report_doc.insert()
 
@@ -181,6 +215,9 @@ async def upload_and_analyze_resume(
             validation_pct=skill_val_results.get("validation_percentage", 0.0) * 100.0,
         ),
         extracted_skills=skills,
+        github_evidence_score=report_doc.github_evidence_score,
+        enhanced_ats_score=report_doc.enhanced_ats_score,
+        github_evidence=report_doc.github_evidence,
         created_at=report_doc.created_at,
     )
     import gc
@@ -251,6 +288,9 @@ async def get_ats_report_by_id(report_id: str, current_user: User = Depends(get_
             validation_pct=svd.get("validation_percentage", 0.0) * 100.0,
         ),
         extracted_skills=[],
+        github_evidence_score=report.github_evidence_score or 0.0,
+        enhanced_ats_score=report.enhanced_ats_score or report.overall_score,
+        github_evidence=report.github_evidence,
         created_at=report.created_at,
     )
 

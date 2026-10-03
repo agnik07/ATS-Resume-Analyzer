@@ -13,7 +13,7 @@ export default function LandingPage() {
       {/* Navigation */}
       <nav className="p-6 md:px-12 flex justify-between items-center border-b border-border/50 backdrop-blur-md">
         <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate('/')}>
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-primary to-blue-600 flex items-center justify-center text-primary-foreground shadow-md shadow-primary/20">
+          <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-md shadow-primary/20">
             <Sparkles className="h-5 w-5" />
           </div>
           <span className="text-xl font-bold tracking-tight">
@@ -45,7 +45,7 @@ export default function LandingPage() {
 
           <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-tight">
             Bridge Your Skill Gap. <br />
-            <span className="bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent">
+            <span className="text-primary">
               Land Your Dream Job.
             </span>
           </h1>
@@ -79,7 +79,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="p-6 rounded-2xl border border-border bg-card/60 backdrop-blur-sm"
+            className="p-6 rounded-2xl border border-border bg-card"
           >
             <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4">
               <Shield className="h-6 w-6" />
@@ -94,9 +94,9 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="p-6 rounded-2xl border border-border bg-card/60 backdrop-blur-sm"
+            className="p-6 rounded-2xl border border-border bg-card"
           >
-            <div className="h-12 w-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center mb-4">
+            <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4">
               <Brain className="h-6 w-6" />
             </div>
             <h3 className="text-lg font-bold text-foreground">Single-Source Skill Gap</h3>
@@ -109,9 +109,9 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="p-6 rounded-2xl border border-border bg-card/60 backdrop-blur-sm"
+            className="p-6 rounded-2xl border border-border bg-card"
           >
-            <div className="h-12 w-12 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center mb-4">
+            <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4">
               <Target className="h-6 w-6" />
             </div>
             <h3 className="text-lg font-bold text-foreground">Recruiter Intelligence</h3>

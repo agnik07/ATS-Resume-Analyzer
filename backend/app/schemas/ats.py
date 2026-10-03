@@ -34,6 +34,9 @@ class ATSAnalysisResponse(BaseModel):
     recommendations: List[Dict[str, Any]] = []
     skill_validation_details: SkillValidationDetails
     extracted_skills: List[str] = []
+    github_evidence_score: Optional[float] = 0.0
+    enhanced_ats_score: Optional[float] = 0.0
+    github_evidence: Optional[Dict[str, Any]] = None
     created_at: datetime
 
 

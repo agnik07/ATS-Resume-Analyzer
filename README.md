@@ -67,6 +67,10 @@ A unified enterprise-grade recruitment and career acceleration platform merging 
 2. Go to **SQL Editor** -> **New Query**, paste the contents of `backend/supabase_schema.sql`, and click **Run**.
 3. Copy your project URL and `anon` / `service_role` key into your `.env` file (`SUPABASE_URL` and `SUPABASE_KEY`).
 
+### ⚡ 1-Click App Launcher (Single Click Execution)
+- **macOS Finder**: Double-click `start_app.command` in Finder to automatically launch Docker containers (or native server) and open the web app in your browser!
+- **Terminal**: Run `./start_app.command` or `npm run launch`.
+
 ### 1. Run the Entire Project (Single Command)
 ```bash
 npm run dev

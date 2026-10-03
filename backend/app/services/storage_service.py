@@ -6,6 +6,8 @@ from typing import Optional
 from app.core.config import settings
 from app.database.supabase import get_supabase_client
 
+import re
+
 logger = logging.getLogger(__name__)
 
 
@@ -16,7 +18,8 @@ def upload_resume_file(file_bytes: bytes, filename: str, user_id: str) -> str:
     2. Cloudinary (if configured)
     3. Local filesystem in uploads/
     """
-    clean_filename = f"{user_id}_{filename}".replace(" ", "_")
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", filename)
+    clean_filename = f"{user_id}_{safe_name}"
 
     # 1. Supabase Storage
     client = get_supabase_client()

@@ -10,6 +10,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".doc"}
+SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".doc", ".txt", ".md"}
 
 
 class FileParsingError(Exception):
@@ -18,6 +19,18 @@ class FileParsingError(Exception):
 
 class FileValidationError(Exception):
     pass
+
+
+def extract_text_from_txt(file_bytes: bytes) -> str:
+    """Extract text from plain text or markdown file."""
+    try:
+        text = file_bytes.decode("utf-8", errors="ignore")
+        if not text.strip():
+            raise FileParsingError("No text found in text/markdown file.")
+        return text.strip()
+    except Exception as e:
+        logger.error(f"Text file extraction error: {e}")
+        raise FileParsingError(f"Failed to parse text file: {e}") from e
 
 
 def validate_file(file_bytes: bytes, filename: str) -> Tuple[bool, str, str]:
@@ -38,7 +51,7 @@ def validate_file(file_bytes: bytes, filename: str) -> Tuple[bool, str, str]:
     if ext not in SUPPORTED_EXTENSIONS:
         return (
             False,
-            f"Unsupported file extension '{ext}'. Please upload a PDF (.pdf) or Word document (.docx).",
+            f"Unsupported file extension '{ext}'. Please upload a PDF (.pdf), Word (.docx), or text document.",
             "",
         )
 
@@ -154,6 +167,8 @@ def extract_text(file_bytes: bytes, filename: str) -> str:
         return extract_text_from_pdf(file_bytes)
     elif ext in (".docx", ".doc"):
         return extract_text_from_docx(file_bytes)
+    elif ext in (".txt", ".md"):
+        return extract_text_from_txt(file_bytes)
     else:
         raise FileValidationError(f"Unsupported file extension: {ext}")
 

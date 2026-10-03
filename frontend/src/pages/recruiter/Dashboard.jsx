@@ -17,6 +17,8 @@ import {
   Layers,
 } from 'lucide-react';
 
+import { getScoreColorClass, getScoreBgClass } from '../../lib/scoreUtils';
+
 export default function RecruiterDashboard() {
   const [metrics, setMetrics] = useState(null);
   const [jobs, setJobs] = useState([]);
@@ -50,7 +52,7 @@ export default function RecruiterDashboard() {
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-blue-500/10 via-primary/5 to-background border border-blue-500/15"
+          className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl bg-card border border-border"
         >
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Recruitment Intelligence Console</h1>
@@ -58,7 +60,7 @@ export default function RecruiterDashboard() {
               Screen, rank, and evaluate applicants using deterministic ATS verification and AI candidate insights.
             </p>
           </div>
-          <Button onClick={() => navigate('/recruiter/jobs')} className="gap-2 shadow-md shadow-primary/20">
+          <Button onClick={() => navigate('/recruiter/jobs')} className="gap-2 shadow-sm">
             <Plus className="h-4 w-4" /> Create New Job Listing
           </Button>
         </motion.div>
@@ -71,7 +73,7 @@ export default function RecruiterDashboard() {
                 <span className="text-xs uppercase font-semibold text-muted-foreground">Total Postings</span>
                 <div className="text-3xl font-black font-mono mt-1">{metrics?.total_jobs ?? 0}</div>
               </div>
-              <div className="p-3 rounded-xl bg-blue-500/10 text-blue-500">
+              <div className="p-3 rounded-xl bg-primary/10 text-primary">
                 <Briefcase className="h-5 w-5" />
               </div>
             </div>
@@ -95,7 +97,7 @@ export default function RecruiterDashboard() {
             <div className="flex justify-between items-start">
               <div>
                 <span className="text-xs uppercase font-semibold text-muted-foreground">Average ATS Score</span>
-                <div className="text-3xl font-black font-mono mt-1 text-emerald-500">
+                <div className={`text-3xl font-black font-mono mt-1 ${getScoreColorClass(metrics?.average_candidate_ats_score)}`}>
                   {metrics?.average_candidate_ats_score ?? 0}
                 </div>
               </div>

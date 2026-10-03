@@ -73,6 +73,16 @@ function saveProgress(progress) {
   }
 }
 
+const getDifficultyBadge = (difficulty) => {
+  if (difficulty === 'Easy') {
+    return 'bg-[#0F6E56]/10 text-[#0F6E56] border-[#0F6E56]/20 dark:bg-[#5DCAA5]/15 dark:text-[#5DCAA5] dark:border-[#5DCAA5]/30';
+  }
+  if (difficulty === 'Medium') {
+    return 'bg-[#BA7517]/10 text-[#BA7517] border-[#BA7517]/20 dark:bg-[#EF9F27]/15 dark:text-[#EF9F27] dark:border-[#EF9F27]/30';
+  }
+  return 'bg-[#993C1D]/10 text-[#993C1D] border-[#993C1D]/20 dark:bg-[#F0997B]/15 dark:text-[#F0997B] dark:border-[#F0997B]/30';
+};
+
 export default function DSATracker() {
   const [problems, setProblems] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -401,25 +411,25 @@ export default function DSATracker() {
           <div className="p-4 rounded-2xl border border-border bg-card flex items-center justify-between">
             <div>
               <div className="text-xs text-muted-foreground font-medium">Easy Problems</div>
-              <div className="text-xl font-bold font-mono text-emerald-500">{difficultyCounts.easy}</div>
+              <div className="text-xl font-bold font-mono text-[#0F6E56] dark:text-[#5DCAA5]">{difficultyCounts.easy}</div>
             </div>
-            <div className="h-2 w-2 rounded-full bg-emerald-500" />
+            <div className="h-2 w-2 rounded-full bg-[#0F6E56] dark:bg-[#5DCAA5]" />
           </div>
 
           <div className="p-4 rounded-2xl border border-border bg-card flex items-center justify-between">
             <div>
               <div className="text-xs text-muted-foreground font-medium">Medium Problems</div>
-              <div className="text-xl font-bold font-mono text-amber-500">{difficultyCounts.medium}</div>
+              <div className="text-xl font-bold font-mono text-[#BA7517] dark:text-[#EF9F27]">{difficultyCounts.medium}</div>
             </div>
-            <div className="h-2 w-2 rounded-full bg-amber-500" />
+            <div className="h-2 w-2 rounded-full bg-[#BA7517] dark:bg-[#EF9F27]" />
           </div>
 
           <div className="p-4 rounded-2xl border border-border bg-card flex items-center justify-between">
             <div>
               <div className="text-xs text-muted-foreground font-medium">Hard Problems</div>
-              <div className="text-xl font-bold font-mono text-rose-500">{difficultyCounts.hard}</div>
+              <div className="text-xl font-bold font-mono text-[#993C1D] dark:text-[#F0997B]">{difficultyCounts.hard}</div>
             </div>
-            <div className="h-2 w-2 rounded-full bg-rose-500" />
+            <div className="h-2 w-2 rounded-full bg-[#993C1D] dark:bg-[#F0997B]" />
           </div>
         </div>
 
@@ -487,7 +497,7 @@ export default function DSATracker() {
                     animate={{ opacity: 1, y: 0 }}
                     className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
                       isSolved
-                        ? 'bg-emerald-500/5 border-emerald-500/30'
+                        ? 'bg-primary/10 border-primary/30'
                         : 'bg-card hover:border-primary/40 border-border shadow-sm'
                     }`}
                   >

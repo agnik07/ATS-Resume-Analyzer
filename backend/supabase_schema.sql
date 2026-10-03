@@ -78,6 +78,9 @@ CREATE TABLE IF NOT EXISTS public.ats_reports (
     skill_validation_details JSONB NOT NULL DEFAULT '{}'::jsonb,
     penalties JSONB NOT NULL DEFAULT '{}'::jsonb,
     bonuses JSONB NOT NULL DEFAULT '{}'::jsonb,
+    github_evidence_score NUMERIC(5,2) DEFAULT 0.0,
+    enhanced_ats_score NUMERIC(5,2) DEFAULT 0.0,
+    github_evidence JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -85,6 +88,41 @@ CREATE INDEX IF NOT EXISTS idx_ats_reports_user_id ON public.ats_reports (user_i
 CREATE INDEX IF NOT EXISTS idx_ats_reports_resume_id ON public.ats_reports (resume_id);
 CREATE INDEX IF NOT EXISTS idx_ats_reports_overall_score ON public.ats_reports (overall_score DESC);
 CREATE INDEX IF NOT EXISTS idx_ats_reports_created_at ON public.ats_reports (created_at DESC);
+
+-- ------------------------------------------------------------------------------
+-- 3b. GITHUB EVIDENCE TABLES
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.github_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    username TEXT NOT NULL UNIQUE,
+    profile_url TEXT NOT NULL,
+    public_repo_count INT DEFAULT 0,
+    followers INT DEFAULT 0,
+    following INT DEFAULT 0,
+    retrieved_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.github_evidence (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    resume_id UUID NOT NULL REFERENCES public.resumes(id) ON DELETE CASCADE,
+    ats_report_id UUID NOT NULL REFERENCES public.ats_reports(id) ON DELETE CASCADE,
+    github_username TEXT NOT NULL,
+    github_evidence_score NUMERIC(5,2) NOT NULL DEFAULT 0.0,
+    enhanced_ats_score NUMERIC(5,2) NOT NULL DEFAULT 0.0,
+    repositories_analyzed INT DEFAULT 0,
+    projects_verified_count INT DEFAULT 0,
+    skills_verified_count INT DEFAULT 0,
+    project_matches JSONB NOT NULL DEFAULT '[]'::jsonb,
+    skill_matches JSONB NOT NULL DEFAULT '[]'::jsonb,
+    activity_metrics JSONB NOT NULL DEFAULT '{}'::jsonb,
+    maturity_metrics JSONB NOT NULL DEFAULT '{}'::jsonb,
+    authenticity_analysis JSONB NOT NULL DEFAULT '{}'::jsonb,
+    cross_validation_matrix JSONB NOT NULL DEFAULT '[]'::jsonb,
+    mismatches JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 -- ------------------------------------------------------------------------------
 -- 4. COMPANIES TABLE

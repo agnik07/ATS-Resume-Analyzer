@@ -34,19 +34,19 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Brand Logo */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate(role === 'recruiter' ? '/recruiter/dashboard' : '/dashboard')}>
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-primary to-blue-600 flex items-center justify-center text-primary-foreground shadow-md shadow-primary/20">
+            <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-md shadow-primary/20">
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
               <div className="text-xl font-bold tracking-tight text-foreground flex items-center gap-1.5">
                 SkillGap <span className="text-primary">AI</span>
                 {role === 'recruiter' && (
-                  <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                  <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                     Recruiter
                   </span>
                 )}
                 {role === 'admin' && (
-                  <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-500 border border-purple-500/20">
+                  <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                     Admin
                   </span>
                 )}

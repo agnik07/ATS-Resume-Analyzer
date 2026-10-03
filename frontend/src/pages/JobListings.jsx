@@ -172,7 +172,7 @@ export default function JobListings() {
                       <Award className="h-3.5 w-3.5 text-primary" /> Min ATS: {job.min_ats_score}
                     </div>
                     {isApplied ? (
-                      <span className="text-xs font-semibold text-emerald-500 flex items-center gap-1">
+                      <span className="text-xs font-semibold text-primary flex items-center gap-1">
                         <CheckCircle2 className="h-4 w-4" /> Applied
                       </span>
                     ) : (

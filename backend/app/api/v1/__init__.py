@@ -6,6 +6,7 @@ from app.api.v1.student import router as student_router
 from app.api.v1.recruiter import router as recruiter_router
 from app.api.v1.career import router as career_router
 from app.api.v1.admin import router as admin_router
+from app.api.v1.github import router as github_router
 
 __all__ = [
     "auth_router",
@@ -16,4 +17,5 @@ __all__ = [
     "recruiter_router",
     "career_router",
     "admin_router",
+    "github_router",
 ]

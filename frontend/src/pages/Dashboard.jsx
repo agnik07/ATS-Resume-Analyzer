@@ -21,6 +21,8 @@ import {
   Award,
 } from 'lucide-react';
 
+import { getScoreColorClass, getScoreBgClass } from '../lib/scoreUtils';
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
@@ -42,22 +44,6 @@ export default function Dashboard() {
     }
   };
 
-  const getScoreColor = (score) => {
-    if (!score) return 'text-muted-foreground';
-    if (score >= 85) return 'text-emerald-500';
-    if (score >= 70) return 'text-blue-500';
-    if (score >= 55) return 'text-amber-500';
-    return 'text-rose-500';
-  };
-
-  const getScoreBg = (score) => {
-    if (!score) return 'bg-muted';
-    if (score >= 85) return 'bg-emerald-500/10 border-emerald-500/20';
-    if (score >= 70) return 'bg-blue-500/10 border-blue-500/20';
-    if (score >= 55) return 'bg-amber-500/10 border-amber-500/20';
-    return 'bg-rose-500/10 border-rose-500/20';
-  };
-
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <Navbar />
@@ -67,7 +53,7 @@ export default function Dashboard() {
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-primary/10 via-blue-500/5 to-background border border-primary/15"
+          className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl bg-card border border-border"
         >
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
@@ -78,7 +64,7 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Button onClick={() => navigate('/upload-resume')} className="gap-2 shadow-md shadow-primary/20">
+            <Button onClick={() => navigate('/upload-resume')} className="gap-2 shadow-sm">
               <Upload className="h-4 w-4" /> Scan Resume with ATS
             </Button>
             <Button variant="outline" onClick={() => navigate('/skill-analysis')} className="gap-2">
@@ -92,21 +78,21 @@ export default function Dashboard() {
           {/* ATS Score Card */}
           <motion.div
             whileHover={{ y: -3 }}
-            className={`p-6 rounded-2xl border ${getScoreBg(stats?.latest_ats_score)} flex flex-col justify-between`}
+            className={`p-6 rounded-2xl border ${getScoreBgClass(stats?.latest_ats_score)} flex flex-col justify-between`}
           >
             <div className="flex justify-between items-start">
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Latest ATS Score
                 </span>
-                <div className={`text-4xl font-black mt-2 font-mono ${getScoreColor(stats?.latest_ats_score)}`}>
+                <div className={`text-4xl font-black mt-2 font-mono ${getScoreColorClass(stats?.latest_ats_score)}`}>
                   {stats?.latest_ats_score !== null && stats?.latest_ats_score !== undefined
                     ? `${stats.latest_ats_score}/100`
                     : 'N/A'}
                 </div>
               </div>
-              <div className="p-3 rounded-xl bg-background/80 shadow-sm">
-                <Award className={`h-6 w-6 ${getScoreColor(stats?.latest_ats_score)}`} />
+              <div className="p-3 rounded-xl bg-card/80 shadow-sm border border-border">
+                <Award className={`h-6 w-6 ${getScoreColorClass(stats?.latest_ats_score)}`} />
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-4 line-clamp-2">
@@ -117,7 +103,7 @@ export default function Dashboard() {
           {/* Resumes Parsed Card */}
           <motion.div
             whileHover={{ y: -3 }}
-            className="p-6 rounded-2xl border border-border bg-card/60 backdrop-blur-sm flex flex-col justify-between"
+            className="p-6 rounded-2xl border border-border bg-card flex flex-col justify-between"
           >
             <div className="flex justify-between items-start">
               <div>
@@ -140,7 +126,7 @@ export default function Dashboard() {
           {/* Job Applications Card */}
           <motion.div
             whileHover={{ y: -3 }}
-            className="p-6 rounded-2xl border border-border bg-card/60 backdrop-blur-sm flex flex-col justify-between"
+            className="p-6 rounded-2xl border border-border bg-card flex flex-col justify-between"
           >
             <div className="flex justify-between items-start">
               <div>
@@ -151,7 +137,7 @@ export default function Dashboard() {
                   {stats?.total_applications ?? 0}
                 </div>
               </div>
-              <div className="p-3 rounded-xl bg-blue-500/10 text-blue-500">
+              <div className="p-3 rounded-xl bg-primary/10 text-primary">
                 <Briefcase className="h-6 w-6" />
               </div>
             </div>
@@ -163,18 +149,18 @@ export default function Dashboard() {
           {/* Skill Gaps Card */}
           <motion.div
             whileHover={{ y: -3 }}
-            className="p-6 rounded-2xl border border-border bg-card/60 backdrop-blur-sm flex flex-col justify-between"
+            className="p-6 rounded-2xl border border-border bg-card flex flex-col justify-between"
           >
             <div className="flex justify-between items-start">
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Skill Benchmark
                 </span>
-                <div className="text-4xl font-black mt-2 font-mono text-purple-500">
+                <div className="text-4xl font-black mt-2 font-mono text-foreground">
                   {stats?.recent_skill_gaps?.length ?? 0}
                 </div>
               </div>
-              <div className="p-3 rounded-xl bg-purple-500/10 text-purple-500">
+              <div className="p-3 rounded-xl bg-primary/10 text-primary">
                 <TrendingUp className="h-6 w-6" />
               </div>
             </div>
@@ -212,10 +198,10 @@ export default function Dashboard() {
             <motion.div
               whileHover={{ scale: 1.01 }}
               onClick={() => navigate('/skill-analysis')}
-              className="p-6 rounded-2xl border border-border bg-card hover:border-blue-500/50 transition-all cursor-pointer group flex flex-col justify-between"
+              className="p-6 rounded-2xl border border-border bg-card hover:border-primary/50 transition-all cursor-pointer group flex flex-col justify-between"
             >
               <div>
-                <div className="h-12 w-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center mb-4 group-hover:bg-blue-500 group-hover:text-white transition-all">
+                <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-primary-foreground transition-all">
                   <Brain className="h-6 w-6" />
                 </div>
                 <h3 className="text-lg font-bold text-foreground">Skill Gap Engine</h3>
@@ -223,7 +209,7 @@ export default function Dashboard() {
                   Benchmark your profile against target roles at Google, Amazon, Microsoft, and Meta. Get a tailored 4-week learning roadmap.
                 </p>
               </div>
-              <div className="flex items-center gap-1.5 text-sm font-semibold text-blue-500 mt-6">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-primary mt-6">
                 Compare Skills <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </div>
             </motion.div>
@@ -232,10 +218,10 @@ export default function Dashboard() {
             <motion.div
               whileHover={{ scale: 1.01 }}
               onClick={() => navigate('/jobs')}
-              className="p-6 rounded-2xl border border-border bg-card hover:border-emerald-500/50 transition-all cursor-pointer group flex flex-col justify-between"
+              className="p-6 rounded-2xl border border-border bg-card hover:border-primary/50 transition-all cursor-pointer group flex flex-col justify-between"
             >
               <div>
-                <div className="h-12 w-12 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-4 group-hover:bg-emerald-500 group-hover:text-white transition-all">
+                <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-primary-foreground transition-all">
                   <Briefcase className="h-6 w-6" />
                 </div>
                 <h3 className="text-lg font-bold text-foreground">Verified Job Board</h3>
@@ -243,7 +229,7 @@ export default function Dashboard() {
                   Browse open positions posted by verified recruiters. Instant one-click application with verified ATS score submission.
                 </p>
               </div>
-              <div className="flex items-center gap-1.5 text-sm font-semibold text-emerald-500 mt-6">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-primary mt-6">
                 Explore Jobs <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </div>
             </motion.div>
@@ -252,10 +238,10 @@ export default function Dashboard() {
             <motion.div
               whileHover={{ scale: 1.01 }}
               onClick={() => navigate('/dsa-tracker')}
-              className="p-6 rounded-2xl border border-border bg-card hover:border-amber-500/50 transition-all cursor-pointer group flex flex-col justify-between"
+              className="p-6 rounded-2xl border border-border bg-card hover:border-primary/50 transition-all cursor-pointer group flex flex-col justify-between"
             >
               <div>
-                <div className="h-12 w-12 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-4 group-hover:bg-amber-500 group-hover:text-white transition-all">
+                <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-primary-foreground transition-all">
                   <Code2 className="h-6 w-6" />
                 </div>
                 <h3 className="text-lg font-bold text-foreground">Company DSA Tracker</h3>
@@ -263,7 +249,7 @@ export default function Dashboard() {
                   Master company-specific LeetCode problems curated for Amazon, Google, Microsoft, and Meta coding rounds.
                 </p>
               </div>
-              <div className="flex items-center gap-1.5 text-sm font-semibold text-amber-500 mt-6">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-primary mt-6">
                 Start Practicing <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </div>
             </motion.div>
@@ -272,10 +258,10 @@ export default function Dashboard() {
             <motion.div
               whileHover={{ scale: 1.01 }}
               onClick={() => navigate('/career-test')}
-              className="p-6 rounded-2xl border border-border bg-card hover:border-purple-500/50 transition-all cursor-pointer group flex flex-col justify-between"
+              className="p-6 rounded-2xl border border-border bg-card hover:border-primary/50 transition-all cursor-pointer group flex flex-col justify-between"
             >
               <div>
-                <div className="h-12 w-12 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center mb-4 group-hover:bg-purple-500 group-hover:text-white transition-all">
+                <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-primary-foreground transition-all">
                   <Sparkles className="h-6 w-6" />
                 </div>
                 <h3 className="text-lg font-bold text-foreground">Career Path Test</h3>
@@ -283,7 +269,7 @@ export default function Dashboard() {
                   Discover whether your analytical thinking and coding style best fits Backend, AI/ML, Frontend, or Technical Product Management.
                 </p>
               </div>
-              <div className="flex items-center gap-1.5 text-sm font-semibold text-purple-500 mt-6">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-primary mt-6">
                 Take Assessment <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </div>
             </motion.div>
@@ -292,10 +278,10 @@ export default function Dashboard() {
             <motion.div
               whileHover={{ scale: 1.01 }}
               onClick={() => navigate('/news')}
-              className="p-6 rounded-2xl border border-border bg-card hover:border-indigo-500/50 transition-all cursor-pointer group flex flex-col justify-between"
+              className="p-6 rounded-2xl border border-border bg-card hover:border-primary/50 transition-all cursor-pointer group flex flex-col justify-between"
             >
               <div>
-                <div className="h-12 w-12 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center mb-4 group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-primary-foreground transition-all">
                   <Newspaper className="h-6 w-6" />
                 </div>
                 <h3 className="text-lg font-bold text-foreground">Tech Hiring News</h3>
@@ -303,7 +289,7 @@ export default function Dashboard() {
                   Stay updated with live tech recruitment trends, funding announcements, and in-demand skills in the market.
                 </p>
               </div>
-              <div className="flex items-center gap-1.5 text-sm font-semibold text-indigo-500 mt-6">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-primary mt-6">
                 Read Updates <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </div>
             </motion.div>
@@ -336,12 +322,12 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <span
-                      className={`text-xs font-semibold px-2.5 py-1 rounded-full uppercase ${
+                      className={`text-xs font-semibold px-2.5 py-1 rounded-full uppercase border ${
                         app.status === 'shortlisted' || app.status === 'offered'
-                          ? 'bg-emerald-500/10 text-emerald-500'
+                          ? 'bg-[#0F6E56]/10 text-[#0F6E56] border-[#0F6E56]/20 dark:bg-[#5DCAA5]/15 dark:text-[#5DCAA5] dark:border-[#5DCAA5]/30'
                           : app.status === 'rejected'
-                          ? 'bg-rose-500/10 text-rose-500'
-                          : 'bg-blue-500/10 text-blue-500'
+                          ? 'bg-[#993C1D]/10 text-[#993C1D] border-[#993C1D]/20 dark:bg-[#F0997B]/15 dark:text-[#F0997B] dark:border-[#F0997B]/30'
+                          : 'bg-muted text-muted-foreground border-border'
                       }`}
                     >
                       {app.status}
@@ -380,7 +366,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-base font-bold font-mono text-primary">
+                      <div className={`text-base font-bold font-mono ${getScoreColorClass(gap.match_percentage)}`}>
                         {gap.match_percentage}%
                       </div>
                       <div className="text-[10px] text-muted-foreground uppercase">Match</div>

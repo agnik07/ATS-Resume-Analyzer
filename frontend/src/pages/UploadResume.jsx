@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../lib/api';
 import Navbar from '../components/common/Navbar';
+import GitHubEvidenceDashboard from '../components/github/GitHubEvidenceDashboard';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -23,8 +24,11 @@ import {
   Tag,
 } from 'lucide-react';
 
+import { getScoreColorClass, getScoreBgClass } from '../lib/scoreUtils';
+
 export default function UploadResume() {
   const [file, setFile] = useState(null);
+  const [jdFile, setJdFile] = useState(null);
   const [jobDescription, setJobDescription] = useState('');
   const [uploading, setUploading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
@@ -36,11 +40,25 @@ export default function UploadResume() {
     const selected = e.target.files[0];
     if (selected) {
       const ext = selected.name.split('.').pop().toLowerCase();
-      if (ext === 'pdf' || ext === 'docx') {
+      if (['pdf', 'docx', 'doc', 'txt', 'md'].includes(ext)) {
         setFile(selected);
-        toast.success(`Selected file: ${selected.name}`);
+        toast.success(`Selected resume: ${selected.name}`);
       } else {
-        toast.error('Invalid format. Please upload a PDF (.pdf) or Word document (.docx).');
+        toast.error('Supported formats: PDF (.pdf), Word (.docx), or Text (.txt/.md).');
+        e.target.value = null;
+      }
+    }
+  };
+
+  const handleJdFileChange = (e) => {
+    const selected = e.target.files[0];
+    if (selected) {
+      const ext = selected.name.split('.').pop().toLowerCase();
+      if (['pdf', 'docx', 'doc', 'txt', 'md'].includes(ext)) {
+        setJdFile(selected);
+        toast.success(`Selected JD document: ${selected.name}`);
+      } else {
+        toast.error('Supported JD formats: PDF, Word, or Text document.');
         e.target.value = null;
       }
     }
@@ -55,6 +73,9 @@ export default function UploadResume() {
     setUploading(true);
     const formData = new FormData();
     formData.append('file', file);
+    if (jdFile) {
+      formData.append('jd_file', jdFile);
+    }
     if (jobDescription.trim()) {
       formData.append('job_description', jobDescription.trim());
     }
@@ -94,20 +115,6 @@ export default function UploadResume() {
     }
   };
 
-  const getScoreColor = (score) => {
-    if (score >= 85) return 'text-emerald-500';
-    if (score >= 70) return 'text-blue-500';
-    if (score >= 55) return 'text-amber-500';
-    return 'text-rose-500';
-  };
-
-  const getScoreBg = (score) => {
-    if (score >= 85) return 'bg-emerald-500';
-    if (score >= 70) return 'bg-blue-500';
-    if (score >= 55) return 'bg-amber-500';
-    return 'bg-rose-500';
-  };
-
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <Navbar />
@@ -131,7 +138,7 @@ export default function UploadResume() {
                 <input
                   id="resume-file-input"
                   type="file"
-                  accept=".pdf,.docx"
+                  accept=".pdf,.docx,.doc,.txt,.md"
                   onChange={handleFileChange}
                   className="hidden"
                 />
@@ -140,7 +147,7 @@ export default function UploadResume() {
                   {file ? file.name : 'Click to select or drag and drop your resume'}
                 </h3>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Supported formats: PDF (.pdf) or Word (.docx) — Max 10MB
+                  Supported formats: PDF (.pdf), Word (.docx), or Text (.txt/.md) — Max 10MB
                 </p>
                 {file && (
                   <span className="inline-block mt-3 px-3 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full">
@@ -149,12 +156,32 @@ export default function UploadResume() {
                 )}
               </div>
 
-              <div className="mt-6 space-y-2">
-                <Label htmlFor="jd-textarea">Target Job Description (Optional)</Label>
+              <div className="mt-6 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="jd-textarea">Target Job Description (Optional)</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs gap-1.5"
+                    onClick={() => document.getElementById('jd-file-input').click()}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    {jdFile ? jdFile.name : 'Upload JD Document (PDF/DOCX/TXT)'}
+                  </Button>
+                  <input
+                    id="jd-file-input"
+                    type="file"
+                    accept=".pdf,.docx,.doc,.txt,.md"
+                    onChange={handleJdFileChange}
+                    className="hidden"
+                  />
+                </div>
+
                 <Textarea
                   id="jd-textarea"
                   rows={4}
-                  placeholder="Paste target job description to match keywords and verify JD-specific skill requirements..."
+                  placeholder="Paste target job description OR upload a JD file above to match keywords, verify requirements, and evaluate domain experience..."
                   value={jobDescription}
                   onChange={(e) => setJobDescription(e.target.value)}
                   className="bg-background/50 resize-none text-sm"
@@ -214,18 +241,25 @@ export default function UploadResume() {
             <div className="p-8 rounded-2xl border border-border bg-card flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
               <div className="flex items-center gap-6">
                 <div className="relative flex items-center justify-center">
-                  <div className="w-28 h-28 rounded-full border-4 border-muted flex items-center justify-center">
-                    <span className={`text-4xl font-black font-mono ${getScoreColor(analysisResult.overall_score)}`}>
+                  <div className="w-28 h-28 rounded-full border-4 border-border flex items-center justify-center">
+                    <span className={`text-4xl font-black font-mono ${getScoreColorClass(analysisResult.overall_score)}`}>
                       {analysisResult.overall_score}
                     </span>
                   </div>
                 </div>
                 <div>
-                  <span className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">
-                    Overall ATS Compatibility
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">
+                      Overall ATS Compatibility
+                    </span>
+                    {analysisResult.role_type && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold bg-primary/10 text-primary border border-primary/20">
+                        {analysisResult.role_type === 'consultant' ? 'Consultant / Management' : 'Technical Engineer'}
+                      </span>
+                    )}
+                  </div>
                   <h2 className="text-2xl font-bold text-foreground mt-0.5">
-                    {analysisResult.overall_score >= 80 ? 'ATS Optimized' : analysisResult.overall_score >= 60 ? 'Competitive Resume' : 'Needs Optimization'}
+                    {analysisResult.overall_score >= 70 ? 'ATS Optimized' : analysisResult.overall_score >= 40 ? 'Competitive Resume' : 'Needs Optimization'}
                   </h2>
                   <p className="text-sm text-muted-foreground mt-1 max-w-xl">
                     {analysisResult.interpretation}
@@ -238,11 +272,46 @@ export default function UploadResume() {
                   {downloadingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                   Download PDF Report
                 </Button>
-                <Button onClick={() => navigate('/skill-analysis')} className="gap-2 shadow-md shadow-primary/20">
+                <Button onClick={() => navigate('/skill-analysis')} className="gap-2 shadow-sm">
                   <Brain className="h-4 w-4" /> Compare Skill Gap
                 </Button>
               </div>
             </div>
+
+            {/* Score Modifiers (Points & Penalties) */}
+            {(Object.keys(analysisResult.bonuses || {}).length > 0 || Object.keys(analysisResult.penalties || {}).length > 0) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Bonuses */}
+                <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 flex items-start gap-3">
+                  <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-xs font-bold uppercase text-primary tracking-wider">Applied Score Bonuses (+)</h4>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {Object.entries(analysisResult.bonuses || {}).map(([key, val]) => (
+                        <span key={key} className="px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-primary/10 text-primary border border-primary/20">
+                          +{val} pts: {key.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Penalties */}
+                <div className="p-4 rounded-xl border border-[#993C1D]/20 dark:border-[#F0997B]/30 bg-[#993C1D]/5 dark:bg-[#F0997B]/5 flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-[#993C1D] dark:text-[#F0997B] shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-xs font-bold uppercase text-[#993C1D] dark:text-[#F0997B] tracking-wider">Applied Unverified Penalties (-)</h4>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {Object.entries(analysisResult.penalties || {}).map(([key, val]) => (
+                        <span key={key} className="px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-[#993C1D]/10 text-[#993C1D] dark:text-[#F0997B] border border-[#993C1D]/20">
+                          -{val} pts: {key.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 5-Pillar Breakdown Cards */}
             <div>
@@ -265,7 +334,7 @@ export default function UploadResume() {
                         </div>
                       </div>
                       <div className="w-full bg-muted h-2 rounded-full mt-3 overflow-hidden">
-                        <div className={`h-full ${getScoreBg(pct)} rounded-full`} style={{ width: `${pct}%` }} />
+                        <div className={`h-full ${pct >= 70 ? 'bg-primary' : pct >= 40 ? 'bg-[#BA7517] dark:bg-[#EF9F27]' : 'bg-[#993C1D] dark:bg-[#F0997B]'} rounded-full`} style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   );
@@ -273,16 +342,25 @@ export default function UploadResume() {
               </div>
             </div>
 
+            {/* GitHub Evidence Dashboard Component */}
+            {analysisResult.github_evidence && analysisResult.github_evidence.is_available && (
+              <GitHubEvidenceDashboard
+                githubEvidence={analysisResult.github_evidence}
+                enhancedAtsScore={analysisResult.enhanced_ats_score}
+                originalAtsScore={analysisResult.overall_score}
+              />
+            )}
+
             {/* Skill Evidence & Validation Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Validated Skills */}
               <div className="p-6 rounded-2xl border border-border bg-card">
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="font-bold text-foreground flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                    <CheckCircle2 className="h-5 w-5 text-primary" />
                     Validated Skills ({analysisResult.skill_validation_details?.validated?.length || 0})
                   </h4>
-                  <span className="text-xs font-mono font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                  <span className="text-xs font-mono font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
                     {analysisResult.skill_validation_details?.validation_pct?.toFixed(0)}% Backed by Projects
                   </span>
                 </div>
@@ -290,7 +368,7 @@ export default function UploadResume() {
                   {analysisResult.skill_validation_details?.validated?.map((item, idx) => (
                     <span
                       key={idx}
-                      className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                      className="px-3 py-1 bg-primary/10 border border-primary/20 text-primary rounded-lg text-xs font-semibold flex items-center gap-1.5"
                     >
                       <Tag className="h-3 w-3" />
                       {item.skill}
@@ -304,7 +382,7 @@ export default function UploadResume() {
               <div className="p-6 rounded-2xl border border-border bg-card">
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="font-bold text-foreground flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                    <AlertTriangle className="h-5 w-5 text-[#BA7517] dark:text-[#EF9F27]" />
                     Unvalidated Skills ({analysisResult.skill_validation_details?.unvalidated?.length || 0})
                   </h4>
                   <span className="text-xs text-muted-foreground">Lacks Project Mentions</span>
@@ -314,7 +392,7 @@ export default function UploadResume() {
                     analysisResult.skill_validation_details.unvalidated.map((skill, idx) => (
                       <span
                         key={idx}
-                        className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-lg text-xs font-semibold"
+                        className="px-3 py-1 bg-[#BA7517]/10 dark:bg-[#EF9F27]/15 border border-[#BA7517]/20 dark:border-[#EF9F27]/30 text-[#BA7517] dark:text-[#EF9F27] rounded-lg text-xs font-semibold"
                       >
                         {skill}
                       </span>
@@ -333,7 +411,7 @@ export default function UploadResume() {
                 <ul className="space-y-2">
                   {analysisResult.strengths?.map((s, idx) => (
                     <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                      <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                       <span>{s}</span>
                     </li>
                   ))}

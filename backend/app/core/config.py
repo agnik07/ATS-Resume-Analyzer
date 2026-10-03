@@ -22,10 +22,13 @@ class Settings(BaseSettings):
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
         "http://localhost:5173",
         "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:3002",
         "http://127.0.0.1:5173",
-        "*",
     ]
 
     # Database (Supabase PostgreSQL)
@@ -54,8 +57,8 @@ class Settings(BaseSettings):
 
     # LLM (Groq API)
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-    GROQ_PRIMARY_MODEL: str = "llama-3.3-70b-versatile"
-    GROQ_FAST_MODEL: str = "llama-3.1-8b-instant"
+    GROQ_PRIMARY_MODEL: str = "openai/gpt-oss-20b"
+    GROQ_FAST_MODEL: str = "groq/compound-mini"
 
     # External APIs
     GNEWS_API_KEY: str = os.getenv("GNEWS_API_KEY", "")
