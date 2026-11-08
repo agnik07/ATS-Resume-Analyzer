@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { Toaster } from 'sonner';
 
 import ProtectedRoute from './components/common/ProtectedRoute';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
 
@@ -33,7 +34,8 @@ export default function App() {
       <AuthProvider>
         <Router>
           <Toaster richColors position="top-right" />
-          <Routes>
+          <ErrorBoundary>
+            <Routes>
             {/* Public Routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<AuthPage />} />
@@ -49,6 +51,14 @@ export default function App() {
             />
             <Route
               path="/upload-resume"
+              element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <UploadResume />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/career-readiness"
               element={
                 <ProtectedRoute allowedRoles={['student']}>
                   <UploadResume />
@@ -81,6 +91,14 @@ export default function App() {
             />
             <Route
               path="/news"
+              element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <JobNews />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hiring-intelligence"
               element={
                 <ProtectedRoute allowedRoles={['student']}>
                   <JobNews />
@@ -137,6 +155,22 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/recruiter/pipeline"
+              element={
+                <ProtectedRoute allowedRoles={['recruiter']}>
+                  <CandidateSearch />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/recruiter/candidates"
+              element={
+                <ProtectedRoute allowedRoles={['recruiter']}>
+                  <CandidateSearch />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Admin Protected Routes */}
             <Route
@@ -151,7 +185,8 @@ export default function App() {
             {/* Fallback Route */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </Router>
+        </ErrorBoundary>
+      </Router>
       </AuthProvider>
     </ThemeProvider>
   );

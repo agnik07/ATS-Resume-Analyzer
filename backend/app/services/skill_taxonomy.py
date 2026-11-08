@@ -77,25 +77,42 @@ SKILLS_DATABASE: Dict[str, List[str]] = {
     "pandas": ["pandas"],
     "numpy": ["numpy"],
     "natural language processing": ["nlp", "natural language processing", "spacy", "nltk", "hugging face", "huggingface"],
-    "computer vision": ["computer vision", "cv", "opencv"],
-    "data science": ["data science", "data analysis"],
-    "artificial intelligence": ["artificial intelligence", "ai", "genai", "llm", "large language models"],
+    "computer vision": ["computer vision", "cv", "opencv", "mediapipe", "yolo"],
+    "data science": ["data science", "data analysis", "eda", "exploratory data analysis"],
+    "artificial intelligence": ["artificial intelligence", "ai", "genai", "llm", "large language models", "groq", "openai", "agentic", "agentic workflows", "rag", "langchain"],
+    "prompt engineering": ["prompt engineering", "prompting", "role prompting", "persona prompting", "few-shot prompting"],
+    "llm apis": ["llm apis", "groq", "openai", "gpt", "llm api", "anthropic"],
+    "agentic workflows": ["agentic workflows", "agentic", "ai agents", "langchain", "llamaindex", "autogen", "crewai"],
+    "vector databases": ["vector databases", "vector database", "chromadb", "chroma", "pinecone", "qdrant", "weaviate", "faiss"],
+    "guardrails & fallbacks": ["guardrails & fallbacks", "guardrails", "fallbacks", "nemo guardrails", "structured json output"],
+    "structured json output": ["structured json output", "json output", "json parsing"],
+    "text-to-speech": ["text-to-speech", "gtts", "tts", "speech synthesis"],
+    "speaker recognition": ["speaker recognition", "resemblyzer", "voice recognition"],
+    "audio processing": ["audio processing", "librosa", "torchaudio", "pydub"],
+    "socket.io": ["socket.io", "websockets", "websocket"],
+    "streamlit": ["streamlit"],
+    "supabase": ["supabase"],
     "statistics": ["statistics", "statistical modeling"],
 
     # Data Engineering & BI
     "spark": ["spark", "apache spark", "pyspark"],
     "kafka": ["kafka", "apache kafka"],
     "hadoop": ["hadoop"],
-    "etl": ["etl", "data pipeline", "airflow"],
+    "etl": ["etl", "etl pipelines", "data pipeline", "data pipelines", "airflow"],
+    "data cleaning & validation": ["data cleaning", "data validation", "data cleaning & validation", "data wrangling"],
     "power bi": ["power bi", "powerbi"],
     "tableau": ["tableau"],
     "excel": ["excel", "microsoft excel"],
 
     # Architecture & Core CS
-    "algorithms": ["algorithms", "algorithmic problem solving"],
-    "data structures": ["data structures", "dsa"],
+    "algorithms": ["algorithms", "algorithmic problem solving", "dsa"],
+    "data structures": ["data structures", "dsa", "leetcode"],
+    "data structures & algorithms": ["data structures & algorithms", "dsa", "data structures", "algorithms"],
     "system design": ["system design", "software architecture", "distributed systems"],
-    "object-oriented programming": ["oop", "object-oriented programming"],
+    "object-oriented programming": ["oop", "object-oriented programming", "object oriented programming"],
+    "dbms": ["dbms", "database management", "database management systems"],
+    "operating systems": ["operating systems", "os"],
+    "computer networks": ["computer networks", "networking"],
 
     # Testing & Tools
     "testing": ["testing", "unit testing", "integration testing", "test automation", "qa"],
@@ -103,9 +120,16 @@ SKILLS_DATABASE: Dict[str, List[str]] = {
     "jest": ["jest"],
     "selenium": ["selenium"],
     "cypress": ["cypress"],
+    "hoppscotch": ["hoppscotch", "api testing", "postman"],
     "git": ["git", "github", "gitlab", "version control"],
+    "github actions": ["github actions", "ci/cd", "continuous integration"],
     "jira": ["jira"],
     "agile": ["agile", "scrum", "kanban"],
+    "cross-functional collaboration": ["cross-functional collaboration", "collaboration"],
+    "pitching": ["pitching", "presentation"],
+    "persuasion": ["persuasion"],
+    "remote work": ["remote work"],
+    "stakeholder communication": ["stakeholder communication", "communication"],
 }
 
 # Precompute alias map
@@ -118,8 +142,57 @@ for primary, synonyms in SKILLS_DATABASE.items():
 
 def normalize_skill(skill: str) -> str:
     """Normalize a raw skill text to its canonical name."""
+    if not skill:
+        return ""
     cleaned = skill.strip().lower()
     return SKILL_ALIASES.get(cleaned, cleaned)
+
+
+def expand_skill_variants(raw_skill: str) -> List[str]:
+    """
+    Given a raw skill name (e.g. 'LLM APIs (Groq, OpenAI)', 'Vector Databases (ChromaDB)', 'Data Structures & Algorithms'),
+    generate a comprehensive set of search variants including canonical names, parenthetical terms, and acronyms.
+    """
+    if not raw_skill:
+        return []
+
+    variants = set()
+    raw_lower = raw_skill.strip().lower()
+    variants.add(raw_lower)
+
+    # Extract parenthetical contents e.g. "AWS (EC2, S3)" -> "AWS" + ["EC2", "S3"]
+    import re
+    parentheticals = re.findall(r"\((.*?)\)", raw_skill)
+    clean_base = re.sub(r"\(.*?\)", "", raw_skill).strip().lower()
+
+    if clean_base:
+        variants.add(clean_base)
+        canon_base = normalize_skill(clean_base)
+        variants.add(canon_base.lower())
+
+    for paren in parentheticals:
+        for part in paren.split(","):
+            part_clean = part.strip().lower()
+            if part_clean:
+                variants.add(part_clean)
+
+    # Check canonical synonyms from database
+    canon = normalize_skill(raw_skill)
+    variants.add(canon.lower())
+    if canon.lower() in SKILLS_DATABASE:
+        variants.update([s.lower() for s in SKILLS_DATABASE[canon.lower()]])
+
+    # Common acronym and abbreviation splits
+    if "&" in raw_lower:
+        for p in raw_lower.split("&"):
+            if p.strip():
+                variants.add(p.strip())
+    if "/" in raw_lower:
+        for p in raw_lower.split("/"):
+            if p.strip():
+                variants.add(p.strip())
+
+    return [v for v in variants if len(v) >= 2]
 
 
 def get_all_skills() -> List[str]:

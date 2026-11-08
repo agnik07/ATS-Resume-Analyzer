@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../lib/api';
 import Navbar from '../components/common/Navbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import {
   Code2,
@@ -22,6 +25,11 @@ import {
   ChevronDown,
   TrendingUp,
   Layers,
+  Target,
+  ShieldCheck,
+  Check,
+  BarChart3,
+  HelpCircle,
 } from 'lucide-react';
 
 const PROGRESS_KEY = 'skillgap-dsa-progress-v2';
@@ -65,7 +73,7 @@ function getStoredProgress() {
   }
 }
 
-function saveProgress(progress) {
+function saveStoredProgress(progress) {
   try {
     localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
   } catch (e) {
@@ -73,41 +81,71 @@ function saveProgress(progress) {
   }
 }
 
-const getDifficultyBadge = (difficulty) => {
-  if (difficulty === 'Easy') {
-    return 'bg-[#0F6E56]/10 text-[#0F6E56] border-[#0F6E56]/20 dark:bg-[#5DCAA5]/15 dark:text-[#5DCAA5] dark:border-[#5DCAA5]/30';
-  }
-  if (difficulty === 'Medium') {
-    return 'bg-[#BA7517]/10 text-[#BA7517] border-[#BA7517]/20 dark:bg-[#EF9F27]/15 dark:text-[#EF9F27] dark:border-[#EF9F27]/30';
-  }
-  return 'bg-[#993C1D]/10 text-[#993C1D] border-[#993C1D]/20 dark:bg-[#F0997B]/15 dark:text-[#F0997B] dark:border-[#F0997B]/30';
-};
-
 export default function DSATracker() {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  // Navigation target-aware intent
+  const navState = location.state || {};
+  const targetCompanyFromNav = navState.company || searchParams.get('company') || '';
+  const targetRoleFromNav = navState.role || searchParams.get('role') || '';
+  const missingSkillsFromNav = navState.missing_skills || [];
+
   const [problems, setProblems] = useState([]);
+  const [recommendedProblems, setRecommendedProblems] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [availableTopics, setAvailableTopics] = useState([]);
+
   const [selectedCompany, setSelectedCompany] = useState('google');
   const [companySearchInput, setCompanySearchInput] = useState('');
   const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('FAANG & Big Tech');
 
+  // Filters
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
+  const [selectedTopic, setSelectedTopic] = useState('all');
+  const [completionFilter, setCompletionFilter] = useState('all'); // all, solved, unsolved
   const [problemSearchQuery, setProblemSearchQuery] = useState('');
+
   const [loading, setLoading] = useState(true);
   const [loadingProblems, setLoadingProblems] = useState(false);
+  const [loadingRecommended, setLoadingRecommended] = useState(false);
   const [progress, setProgress] = useState(getStoredProgress);
 
   const dropdownRef = useRef(null);
 
+  // Initialize data and load user progress from Supabase
   useEffect(() => {
     fetchInitialData();
+    loadRemoteProgress();
   }, []);
 
+  // Sync target company from navigation when available
+  useEffect(() => {
+    if (targetCompanyFromNav && companies.length > 0) {
+      const slugMatch = targetCompanyFromNav.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const found = companies.find(
+        (c) => c.slug === slugMatch || c.name.toLowerCase() === targetCompanyFromNav.toLowerCase()
+      );
+      if (found) {
+        setSelectedCompany(found.slug);
+      }
+    }
+  }, [targetCompanyFromNav, companies]);
+
+  // Fetch company problems when company or difficulty changes
   useEffect(() => {
     if (selectedCompany) {
       fetchProblemsForCompany(selectedCompany);
     }
   }, [selectedCompany, selectedDifficulty]);
+
+  // Fetch target-aware recommendations if company or role is specified
+  useEffect(() => {
+    if (targetCompanyFromNav || targetRoleFromNav) {
+      fetchTargetRecommendations();
+    }
+  }, [targetCompanyFromNav, targetRoleFromNav]);
 
   // Close company dropdown when clicking outside
   useEffect(() => {
@@ -120,14 +158,46 @@ export default function DSATracker() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const loadRemoteProgress = async () => {
+    try {
+      const res = await api.get('/career/dsa/progress');
+      if (res.data && res.data.solved_ids) {
+        const remoteMap = {};
+        res.data.solved_ids.forEach((id) => {
+          remoteMap[id] = true;
+        });
+        setProgress((prev) => {
+          const merged = { ...prev, ...remoteMap };
+          saveStoredProgress(merged);
+          return merged;
+        });
+      }
+    } catch {
+      // Local storage fallback continues to work
+    }
+  };
+
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const compRes = await api.get('/career/dsa/companies');
-      const compList = compRes.data || [];
+      const [compRes, topicsRes] = await Promise.allSettled([
+        api.get('/career/dsa/companies'),
+        api.get('/career/dsa/topics'),
+      ]);
+
+      const compList = compRes.status === 'fulfilled' ? compRes.value.data || [] : [];
       setCompanies(compList);
 
-      const initialComp = compList.length > 0 ? compList[0].slug : 'google';
+      if (topicsRes.status === 'fulfilled' && topicsRes.value.data) {
+        setAvailableTopics(topicsRes.value.data.topics || []);
+      }
+
+      const initialComp = targetCompanyFromNav
+        ? targetCompanyFromNav.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+        : compList.length > 0
+        ? compList[0].slug
+        : 'google';
+
       setSelectedCompany(initialComp);
       await fetchProblemsForCompany(initialComp);
     } catch (err) {
@@ -156,6 +226,50 @@ export default function DSATracker() {
     }
   };
 
+  const fetchTargetRecommendations = async () => {
+    setLoadingRecommended(true);
+    try {
+      const res = await api.get('/career/dsa/recommended', {
+        params: {
+          target_company: targetCompanyFromNav || undefined,
+          target_role: targetRoleFromNav || undefined,
+          missing_skills: missingSkillsFromNav.length ? missingSkillsFromNav.join(',') : undefined,
+          limit: 15,
+        },
+      });
+      setRecommendedProblems(res.data.recommended || []);
+    } catch (err) {
+      console.error('Failed to load target recommendations:', err);
+    } finally {
+      setLoadingRecommended(false);
+    }
+  };
+
+  // Toggle solved status with Supabase persistence
+  const toggleProblem = async (problemId, problemTitle = '', companySlug = '', difficulty = '') => {
+    const nextSolved = !progress[problemId];
+    const next = { ...progress, [problemId]: nextSolved };
+    setProgress(next);
+    saveStoredProgress(next);
+
+    try {
+      await api.post('/career/dsa/progress', {
+        problem_id: String(problemId),
+        problem_title: problemTitle,
+        company_slug: companySlug || selectedCompany,
+        difficulty: difficulty || 'Medium',
+        solved: nextSolved,
+      });
+      if (nextSolved) {
+        toast.success(`Marked "${problemTitle || `Problem #${problemId}`}" as solved! 🎉`);
+      } else {
+        toast.info(`Unmarked "${problemTitle || `Problem #${problemId}`}".`);
+      }
+    } catch {
+      // Progress preserved locally
+    }
+  };
+
   // Filtered companies based on search input
   const filteredCompanySuggestions = useMemo(() => {
     if (!companySearchInput.trim()) return companies.slice(0, 50);
@@ -172,57 +286,84 @@ export default function DSATracker() {
     toast.info(`Loaded questions for ${name || slug}`);
   };
 
-  // Filtered problem list based on search query
+  // Filtered problem list
   const filteredProblems = useMemo(() => {
-    if (!problemSearchQuery.trim()) return problems;
-    const q = problemSearchQuery.toLowerCase().trim();
-    return problems.filter(
-      (p) =>
-        p.title.toLowerCase().includes(q) ||
-        String(p.id).toLowerCase().includes(q)
-    );
-  }, [problems, problemSearchQuery]);
+    return problems.filter((p) => {
+      // Search query
+      if (problemSearchQuery.trim()) {
+        const q = problemSearchQuery.toLowerCase().trim();
+        const matchesTitle = p.title?.toLowerCase().includes(q);
+        const matchesId = String(p.id).toLowerCase().includes(q);
+        if (!matchesTitle && !matchesId) return false;
+      }
 
-  const toggleProblem = (id) => {
-    const next = { ...progress, [id]: !progress[id] };
-    setProgress(next);
-    saveProgress(next);
-    if (!progress[id]) {
-      toast.success('Problem marked as solved! 🎉');
-    }
-  };
+      // Topic filter
+      if (selectedTopic !== 'all') {
+        const pTopic = (p.topic || '').toLowerCase();
+        if (pTopic !== selectedTopic.toLowerCase()) return false;
+      }
 
-  const solvedForCurrentCompany = useMemo(() => {
-    return problems.filter((p) => progress[p.id]).length;
-  }, [problems, progress]);
+      // Completion filter
+      const isSolved = !!progress[p.id];
+      if (completionFilter === 'solved' && !isSolved) return false;
+      if (completionFilter === 'unsolved' && isSolved) return false;
 
-  const totalSolvedOverall = Object.values(progress).filter(Boolean).length;
+      return true;
+    });
+  }, [problems, problemSearchQuery, selectedTopic, completionFilter, progress]);
 
+  // Overall & Company Statistics
   const currentCompanyMeta = useMemo(() => {
-    return companies.find((c) => c.slug === selectedCompany) || {
-      name: selectedCompany.replace('-', ' ').toUpperCase(),
-      count: problems.length,
-    };
+    return (
+      companies.find((c) => c.slug === selectedCompany) || {
+        name: selectedCompany.replace('-', ' ').toUpperCase(),
+        count: problems.length,
+      }
+    );
   }, [companies, selectedCompany, problems]);
 
-  const difficultyCounts = useMemo(() => {
+  const stats = useMemo(() => {
+    const totalCompany = problems.length;
+    const solvedCompany = problems.filter((p) => progress[p.id]).length;
+    const unsolvedCompany = totalCompany - solvedCompany;
+    const completionRate = totalCompany > 0 ? Math.round((solvedCompany / totalCompany) * 100) : 0;
+
+    const easyProblems = problems.filter((p) => p.difficulty?.toLowerCase() === 'easy');
+    const easySolved = easyProblems.filter((p) => progress[p.id]).length;
+
+    const mediumProblems = problems.filter((p) => p.difficulty?.toLowerCase() === 'medium');
+    const mediumSolved = mediumProblems.filter((p) => progress[p.id]).length;
+
+    const hardProblems = problems.filter((p) => p.difficulty?.toLowerCase() === 'hard');
+    const hardSolved = hardProblems.filter((p) => progress[p.id]).length;
+
+    const totalSolvedOverall = Object.values(progress).filter(Boolean).length;
+
     return {
-      easy: problems.filter((p) => p.difficulty?.toLowerCase() === 'easy').length,
-      medium: problems.filter((p) => p.difficulty?.toLowerCase() === 'medium').length,
-      hard: problems.filter((p) => p.difficulty?.toLowerCase() === 'hard').length,
+      totalCompany,
+      solvedCompany,
+      unsolvedCompany,
+      completionRate,
+      easyTotal: easyProblems.length,
+      easySolved,
+      mediumTotal: mediumProblems.length,
+      mediumSolved,
+      hardTotal: hardProblems.length,
+      hardSolved,
+      totalSolvedOverall,
     };
-  }, [problems]);
+  }, [problems, progress]);
 
   const getDifficultyBadge = (diff) => {
     switch (diff?.toLowerCase()) {
       case 'easy':
-        return 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500';
+        return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500';
       case 'medium':
-        return 'bg-amber-500/10 border-amber-500/20 text-amber-500';
+        return 'bg-amber-500/10 border-amber-500/30 text-amber-500';
       case 'hard':
-        return 'bg-rose-500/10 border-rose-500/20 text-rose-500';
+        return 'bg-rose-500/10 border-rose-500/30 text-rose-500';
       default:
-        return 'bg-muted text-muted-foreground';
+        return 'bg-muted text-muted-foreground border-border';
     }
   };
 
@@ -231,7 +372,103 @@ export default function DSATracker() {
       <Navbar />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Header Banner */}
+        {/* Target-Aware Recommendation Banner (if coming from Career Readiness) */}
+        {(targetCompanyFromNav || targetRoleFromNav) && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-6 rounded-3xl border border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-card backdrop-blur-xl shadow-lg space-y-4"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-primary text-primary-foreground text-[10px] font-bold uppercase">
+                    <Target className="h-3 w-3 mr-1 inline" /> Targeted Career Roadmap Active
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">Authentic Provenance Linked</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-foreground">
+                  Targeted DSA Preparation for{' '}
+                  <span className="text-primary">{targetCompanyFromNav || 'Top Tech'}</span>
+                  {targetRoleFromNav && ` (${targetRoleFromNav})`}
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Questions mapped directly to verified interview tags for {targetCompanyFromNav} from our 3,310 master problem dataset.
+                </p>
+              </div>
+
+              {recommendedProblems.length > 0 && (
+                <div className="px-4 py-2 rounded-xl bg-background/80 border border-border text-center shrink-0">
+                  <div className="text-lg font-black font-mono text-primary">
+                    {recommendedProblems.filter((p) => progress[p.id]).length} / {recommendedProblems.length}
+                  </div>
+                  <div className="text-[10px] uppercase font-bold text-muted-foreground">Target Ready</div>
+                </div>
+              )}
+            </div>
+
+            {/* Target Curated Questions Cards */}
+            {recommendedProblems.length > 0 && (
+              <div className="pt-2 border-t border-border/40">
+                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" /> Curated High-Frequency Target Problems
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {recommendedProblems.slice(0, 6).map((prob) => {
+                    const isSolved = !!progress[prob.id];
+                    return (
+                      <div
+                        key={prob.id}
+                        className={`p-3.5 rounded-xl border transition-all flex items-start gap-3 ${
+                          isSolved
+                            ? 'bg-primary/5 border-primary/40'
+                            : 'bg-card border-border hover:border-primary/30'
+                        }`}
+                      >
+                        <Checkbox
+                          checked={isSolved}
+                          onCheckedChange={() =>
+                            toggleProblem(prob.id, prob.title, prob.company_tag || targetCompanyFromNav, prob.difficulty)
+                          }
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getDifficultyBadge(prob.difficulty)}`}>
+                              {prob.difficulty}
+                            </span>
+                            <span className="text-[10px] font-semibold text-emerald-500 flex items-center gap-0.5">
+                              <ShieldCheck className="h-3 w-3" />
+                              {prob.is_company_tagged ? `Verified (${prob.company_tag})` : 'Recommended'}
+                            </span>
+                          </div>
+                          <div className={`text-xs font-bold mt-1.5 truncate ${isSolved ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                            {prob.title}
+                          </div>
+                          <div className="flex items-center justify-between mt-2 text-[10px] text-muted-foreground">
+                            <span>{prob.topic || 'Algorithms'}</span>
+                            {prob.url && (
+                              <a
+                                href={prob.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline font-semibold flex items-center gap-0.5"
+                              >
+                                LeetCode <ExternalLink className="h-2.5 w-2.5" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Header Hero Banner */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -240,29 +477,97 @@ export default function DSATracker() {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div className="space-y-2 max-w-3xl">
               <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-primary/20 bg-primary/10 text-xs font-semibold text-primary">
-                <Sparkles className="h-3.5 w-3.5" /> 3,300+ LeetCode Questions Across 660+ Companies
+                <Sparkles className="h-3.5 w-3.5" /> 3,310+ LeetCode Questions Across 660+ Verified Tech Employers
               </div>
               <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-                Company-Specific DSA Preparation Bank
+                Company-Specific DSA Question Bank & Progress Tracker
               </h1>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Practice real coding interview questions asked by top tech employers. Filter by company frequency, search by question name/number, and track your progress.
+                Master verified algorithmic interview questions asked by top tech giants. Real data provenance preserved directly from company interview rounds.
               </p>
             </div>
 
-            {/* Solved Progress Stats */}
+            {/* Overall Progress Counter */}
             <div className="flex items-center gap-4 bg-muted/40 p-4 sm:p-5 rounded-2xl border border-border shrink-0">
               <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-primary to-emerald-500 text-white flex items-center justify-center shadow-lg shadow-primary/20">
                 <Trophy className="h-6 w-6" />
               </div>
               <div>
                 <div className="text-2xl font-black font-mono text-foreground">
-                  {solvedForCurrentCompany}{' '}
-                  <span className="text-sm font-normal text-muted-foreground">/ {problems.length}</span>
+                  {stats.solvedCompany}{' '}
+                  <span className="text-sm font-normal text-muted-foreground">/ {stats.totalCompany}</span>
                 </div>
                 <div className="text-xs text-muted-foreground">
                   Solved for <span className="font-semibold text-foreground">{currentCompanyMeta.name}</span>
+                  <span className="ml-2 font-mono text-primary font-bold">({stats.completionRate}%)</span>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Progress Visualizations */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-border/50">
+            {/* Overall Company Progress Bar */}
+            <div className="p-4 rounded-2xl border border-border bg-card/60 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-foreground">Company Mastery</span>
+                <span className="font-mono font-bold text-primary">{stats.completionRate}%</span>
+              </div>
+              <Progress value={stats.completionRate} className="h-2 rounded-full" />
+              <div className="flex justify-between text-[11px] text-muted-foreground">
+                <span>{stats.solvedCompany} solved</span>
+                <span>{stats.unsolvedCompany} remaining</span>
+              </div>
+            </div>
+
+            {/* Easy Progress */}
+            <div className="p-4 rounded-2xl border border-border bg-card/60 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-emerald-500">Easy</span>
+                <span className="font-mono text-xs">
+                  {stats.easySolved} / {stats.easyTotal}
+                </span>
+              </div>
+              <Progress
+                value={stats.easyTotal > 0 ? (stats.easySolved / stats.easyTotal) * 100 : 0}
+                className="h-2 rounded-full bg-emerald-500/10 [&>div]:bg-emerald-500"
+              />
+              <div className="text-[11px] text-muted-foreground">
+                {stats.easyTotal > 0 ? Math.round((stats.easySolved / stats.easyTotal) * 100) : 0}% completed
+              </div>
+            </div>
+
+            {/* Medium Progress */}
+            <div className="p-4 rounded-2xl border border-border bg-card/60 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-amber-500">Medium</span>
+                <span className="font-mono text-xs">
+                  {stats.mediumSolved} / {stats.mediumTotal}
+                </span>
+              </div>
+              <Progress
+                value={stats.mediumTotal > 0 ? (stats.mediumSolved / stats.mediumTotal) * 100 : 0}
+                className="h-2 rounded-full bg-amber-500/10 [&>div]:bg-amber-500"
+              />
+              <div className="text-[11px] text-muted-foreground">
+                {stats.mediumTotal > 0 ? Math.round((stats.mediumSolved / stats.mediumTotal) * 100) : 0}% completed
+              </div>
+            </div>
+
+            {/* Hard Progress */}
+            <div className="p-4 rounded-2xl border border-border bg-card/60 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-rose-500">Hard</span>
+                <span className="font-mono text-xs">
+                  {stats.hardSolved} / {stats.hardTotal}
+                </span>
+              </div>
+              <Progress
+                value={stats.hardTotal > 0 ? (stats.hardSolved / stats.hardTotal) * 100 : 0}
+                className="h-2 rounded-full bg-rose-500/10 [&>div]:bg-rose-500"
+              />
+              <div className="text-[11px] text-muted-foreground">
+                {stats.hardTotal > 0 ? Math.round((stats.hardSolved / stats.hardTotal) * 100) : 0}% completed
               </div>
             </div>
           </div>
@@ -275,7 +580,7 @@ export default function DSATracker() {
                 <div className="relative">
                   <Building2 className="absolute left-3.5 top-3.5 h-4 w-4 text-primary" />
                   <Input
-                    placeholder="Search any company (e.g. Google, Stripe, Databricks, Citadel, Goldman Sachs)..."
+                    placeholder="Search any company (e.g. Google, Amazon, Stripe, Databricks, Citadel, Microsoft)..."
                     value={companySearchInput}
                     onChange={(e) => {
                       setCompanySearchInput(e.target.value);
@@ -349,44 +654,43 @@ export default function DSATracker() {
               {/* Active Company Pill Display */}
               <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 border border-primary/20 shrink-0">
                 <Building2 className="h-4 w-4 text-primary" />
-                <span className="text-xs font-semibold text-primary">Active:</span>
                 <span className="text-xs font-bold text-foreground">{currentCompanyMeta.name}</span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/20 text-primary font-bold">
-                  {problems.length} Qs
+                <span className="text-[11px] font-mono text-primary font-bold">
+                  ({problems.length} questions)
                 </span>
               </div>
             </div>
 
-            {/* Reputed Company Category Tabs */}
-            <div className="space-y-2 pt-1">
-              <div className="flex items-center gap-3 border-b border-border/40 pb-2">
-                {Object.keys(REPUTED_CATEGORIES).map((category) => (
+            {/* Quick Category Tabs */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
+                {Object.keys(REPUTED_CATEGORIES).map((catName) => (
                   <button
-                    key={category}
-                    onClick={() => setActiveCategory(category)}
-                    className={`text-xs font-bold transition-colors pb-1 border-b-2 -mb-2.5 ${
-                      activeCategory === category
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    key={catName}
+                    onClick={() => setActiveCategory(catName)}
+                    className={`px-3 py-1.5 rounded-xl font-semibold transition-all whitespace-nowrap ${
+                      activeCategory === catName
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted/40 hover:bg-muted text-muted-foreground'
                     }`}
                   >
-                    {category}
+                    {catName}
                   </button>
                 ))}
               </div>
 
-              {/* Category Quick-Pick Pills */}
-              <div className="flex flex-wrap gap-2 pt-2">
+              {/* Quick Company Badges for selected category */}
+              <div className="flex flex-wrap gap-2 pt-1">
                 {REPUTED_CATEGORIES[activeCategory]?.map((comp) => {
-                  const isActive = selectedCompany === comp.slug;
+                  const isSelected = selectedCompany === comp.slug;
                   return (
                     <button
                       key={comp.slug}
                       onClick={() => selectCompanyHandler(comp.slug, comp.name)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 border ${
-                        isActive
-                          ? 'bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20 font-bold'
-                          : 'bg-card/80 text-muted-foreground border-border hover:border-primary/40 hover:text-foreground'
+                      className={`text-xs px-3 py-1.5 rounded-xl border transition-all font-medium flex items-center gap-1.5 ${
+                        isSelected
+                          ? 'bg-primary text-primary-foreground border-primary font-bold shadow-sm'
+                          : 'bg-card hover:bg-muted text-muted-foreground hover:text-foreground border-border'
                       }`}
                     >
                       {comp.name}
@@ -398,171 +702,213 @@ export default function DSATracker() {
           </div>
         </motion.div>
 
-        {/* Breakdown Badges Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          <div className="p-4 rounded-2xl border border-border bg-card flex items-center justify-between">
-            <div>
-              <div className="text-xs text-muted-foreground font-medium">Total Questions</div>
-              <div className="text-xl font-bold font-mono text-foreground">{problems.length}</div>
+        {/* Filters and Search Bar for Problems */}
+        <div className="p-5 rounded-2xl border border-border bg-card/60 backdrop-blur-md shadow-sm space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+            {/* Search Input */}
+            <div className="relative lg:col-span-4">
+              <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search problem title or #ID..."
+                value={problemSearchQuery}
+                onChange={(e) => setProblemSearchQuery(e.target.value)}
+                className="pl-9 pr-4 py-2 text-xs bg-background rounded-xl border-border"
+              />
             </div>
-            <Layers className="h-5 w-5 text-primary" />
-          </div>
 
-          <div className="p-4 rounded-2xl border border-border bg-card flex items-center justify-between">
-            <div>
-              <div className="text-xs text-muted-foreground font-medium">Easy Problems</div>
-              <div className="text-xl font-bold font-mono text-[#0F6E56] dark:text-[#5DCAA5]">{difficultyCounts.easy}</div>
-            </div>
-            <div className="h-2 w-2 rounded-full bg-[#0F6E56] dark:bg-[#5DCAA5]" />
-          </div>
-
-          <div className="p-4 rounded-2xl border border-border bg-card flex items-center justify-between">
-            <div>
-              <div className="text-xs text-muted-foreground font-medium">Medium Problems</div>
-              <div className="text-xl font-bold font-mono text-[#BA7517] dark:text-[#EF9F27]">{difficultyCounts.medium}</div>
-            </div>
-            <div className="h-2 w-2 rounded-full bg-[#BA7517] dark:bg-[#EF9F27]" />
-          </div>
-
-          <div className="p-4 rounded-2xl border border-border bg-card flex items-center justify-between">
-            <div>
-              <div className="text-xs text-muted-foreground font-medium">Hard Problems</div>
-              <div className="text-xl font-bold font-mono text-[#993C1D] dark:text-[#F0997B]">{difficultyCounts.hard}</div>
-            </div>
-            <div className="h-2 w-2 rounded-full bg-[#993C1D] dark:bg-[#F0997B]" />
-          </div>
-        </div>
-
-        {/* Problem Search & Difficulty Filter Bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl border border-border bg-card">
-          <div className="relative w-full sm:max-w-md">
-            <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder={`Search ${currentCompanyMeta.name} problems by title or # ID...`}
-              value={problemSearchQuery}
-              onChange={(e) => setProblemSearchQuery(e.target.value)}
-              className="pl-10 bg-background"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-            <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1 shrink-0">
-              <Filter className="h-3.5 w-3.5" /> Difficulty:
-            </span>
-            {['all', 'Easy', 'Medium', 'Hard'].map((diff) => (
-              <button
-                key={diff}
-                onClick={() => setSelectedDifficulty(diff)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border shrink-0 ${
-                  selectedDifficulty === diff
-                    ? 'bg-primary/20 text-primary border-primary/40 font-bold'
-                    : 'bg-muted/40 text-muted-foreground border-transparent hover:text-foreground'
-                }`}
+            {/* Topic Filter */}
+            <div className="lg:col-span-3">
+              <select
+                value={selectedTopic}
+                onChange={(e) => setSelectedTopic(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xl bg-background border border-border text-foreground font-medium focus:outline-none focus:ring-1 focus:ring-primary"
               >
-                {diff.charAt(0).toUpperCase() + diff.slice(1)}
-              </button>
-            ))}
+                <option value="all">All Algorithmic Topics</option>
+                {availableTopics.map((topic) => (
+                  <option key={topic} value={topic}>
+                    {topic}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Difficulty Filter */}
+            <div className="lg:col-span-3">
+              <select
+                value={selectedDifficulty}
+                onChange={(e) => setSelectedDifficulty(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xl bg-background border border-border text-foreground font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="all">All Difficulties</option>
+                <option value="Easy">Easy</option>
+                <option value="Medium">Medium</option>
+                <option value="Hard">Hard</option>
+              </select>
+            </div>
+
+            {/* Completion Status Filter */}
+            <div className="lg:col-span-2">
+              <select
+                value={completionFilter}
+                onChange={(e) => setCompletionFilter(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xl bg-background border border-border text-foreground font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="all">Status: All</option>
+                <option value="solved">Status: Solved</option>
+                <option value="unsolved">Status: Unsolved</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        {/* Problems List */}
-        {loading || loadingProblems ? (
-          <div className="p-16 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm font-medium">Loading interview questions for {currentCompanyMeta.name}...</p>
+        {/* Problems List Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
+              <Code2 className="h-4 w-4 text-primary" />
+              Verified LeetCode Questions for {currentCompanyMeta.name}
+            </h3>
+            <span className="text-xs text-muted-foreground font-mono">
+              Showing {filteredProblems.length} of {problems.length} problems
+            </span>
           </div>
-        ) : filteredProblems.length === 0 ? (
-          <div className="p-16 text-center border border-dashed border-border rounded-2xl bg-card/40 space-y-3">
-            <Code2 className="h-10 w-10 text-muted-foreground mx-auto" />
-            <h3 className="text-lg font-bold text-foreground">No questions found</h3>
-            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-              No DSA questions matched your filters for {currentCompanyMeta.name}. Try selecting a different difficulty or search term.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="flex justify-between items-center text-xs text-muted-foreground px-2 font-medium">
-              <span>Showing {filteredProblems.length} curated problems for {currentCompanyMeta.name}</span>
-              <span>Overall Bank: {totalSolvedOverall} solved across all companies</span>
-            </div>
 
-            <div className="grid grid-cols-1 gap-3">
-              {filteredProblems.map((prob) => {
+          {loadingProblems ? (
+            <div className="py-20 text-center space-y-3">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              <p className="text-xs text-muted-foreground">Loading company questions from master bank...</p>
+            </div>
+          ) : filteredProblems.length === 0 ? (
+            <div className="text-center py-16 p-8 rounded-3xl border border-border bg-card max-w-md mx-auto space-y-3">
+              <Code2 className="h-10 w-10 mx-auto text-muted-foreground/60" />
+              <h4 className="text-base font-bold text-foreground">No questions match your filter criteria</h4>
+              <p className="text-xs text-muted-foreground">
+                Try selecting "All Difficulties" or clearing the topic filter.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedDifficulty('all');
+                  setSelectedTopic('all');
+                  setCompletionFilter('all');
+                  setProblemSearchQuery('');
+                }}
+                className="rounded-xl text-xs"
+              >
+                Reset All Filters
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredProblems.map((prob, idx) => {
                 const isSolved = !!progress[prob.id];
+                const practiceUrl = prob.leetcode_url || prob.url || `https://leetcode.com/problems/${prob.slug || prob.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/`;
+
                 return (
                   <motion.div
-                    key={prob.id}
-                    layout
+                    key={prob.id || idx}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(idx * 0.02, 0.3) }}
                     className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
                       isSolved
-                        ? 'bg-primary/10 border-primary/30'
-                        : 'bg-card hover:border-primary/40 border-border shadow-sm'
+                        ? 'bg-primary/5 border-primary/30 shadow-sm'
+                        : 'bg-card border-border hover:border-primary/40 shadow-sm'
                     }`}
                   >
-                    <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                    {/* Left: Checkbox & Problem Info */}
+                    <div className="flex items-start gap-3.5 flex-1 min-w-0">
                       <Checkbox
-                        id={`check-${prob.id}`}
                         checked={isSolved}
-                        onCheckedChange={() => toggleProblem(prob.id)}
-                        className="mt-1 sm:mt-0"
+                        onCheckedChange={() =>
+                          toggleProblem(prob.id, prob.title, selectedCompany, prob.difficulty)
+                        }
+                        className="mt-1 shrink-0"
                       />
-                      <div className="space-y-1 min-w-0">
+
+                      <div className="space-y-1 min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-mono font-bold text-muted-foreground">
                             #{prob.id}
                           </span>
                           <span
-                            className={`font-semibold text-sm truncate ${
-                              isSolved ? 'line-through text-muted-foreground' : 'text-foreground'
-                            }`}
-                          >
-                            {prob.title}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-md border text-[11px] font-bold ${getDifficultyBadge(
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${getDifficultyBadge(
                               prob.difficulty
                             )}`}
                           >
                             {prob.difficulty}
                           </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground border border-border">
+                            {prob.topic || 'Algorithms'}
+                          </span>
+                          <Badge variant="outline" className="text-[10px] text-emerald-500 border-emerald-500/20 bg-emerald-500/5">
+                            <ShieldCheck className="h-3 w-3 mr-1 inline" />
+                            Asked at {currentCompanyMeta.name}
+                          </Badge>
                         </div>
 
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                          {prob.frequency && (
-                            <span className="inline-flex items-center gap-1 text-amber-400 font-medium">
-                              <Flame className="h-3.5 w-3.5" /> {prob.frequency} Frequency
+                        <h4
+                          className={`text-sm sm:text-base font-bold truncate ${
+                            isSolved ? 'line-through text-muted-foreground' : 'text-foreground'
+                          }`}
+                        >
+                          {prob.title}
+                        </h4>
+
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          {prob.acceptance && (
+                            <span className="flex items-center gap-1">
+                              <Percent className="h-3 w-3" /> Acceptance: {prob.acceptance}
                             </span>
                           )}
-                          {prob.acceptance && (
-                            <span className="inline-flex items-center gap-1 font-medium">
-                              <Percent className="h-3 w-3" /> {prob.acceptance} Acceptance
+                          {prob.frequency && (
+                            <span className="flex items-center gap-1 text-primary font-medium">
+                              <Flame className="h-3 w-3" /> Frequency: {prob.frequency}
                             </span>
                           )}
                         </div>
                       </div>
                     </div>
 
+                    {/* Right: Actions */}
                     <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                       <Button
                         size="sm"
-                        variant="outline"
-                        asChild
-                        className="rounded-xl gap-1.5 text-xs hover:border-primary hover:text-primary font-medium"
+                        variant={isSolved ? 'outline' : 'default'}
+                        onClick={() =>
+                          toggleProblem(prob.id, prob.title, selectedCompany, prob.difficulty)
+                        }
+                        className="rounded-xl text-xs font-semibold gap-1.5"
                       >
-                        <a href={prob.url} target="_blank" rel="noopener noreferrer">
-                          Solve on LeetCode
-                          <ExternalLink className="h-3.5 w-3.5 ml-0.5" />
-                        </a>
+                        {isSolved ? (
+                          <>
+                            <Check className="h-3.5 w-3.5 text-emerald-500" /> Solved
+                          </>
+                        ) : (
+                          'Mark Solved'
+                        )}
                       </Button>
+
+                      {practiceUrl && (
+                        <Button
+                          asChild
+                          size="sm"
+                          variant="ghost"
+                          className="rounded-xl text-xs font-semibold gap-1 text-primary hover:text-primary"
+                        >
+                          <a href={practiceUrl} target="_blank" rel="noopener noreferrer">
+                            LeetCode <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        </Button>
+                      )}
                     </div>
                   </motion.div>
                 );
               })}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </main>
     </div>
   );

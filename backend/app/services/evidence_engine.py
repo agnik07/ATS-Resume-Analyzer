@@ -42,7 +42,7 @@ async def run_github_evidence_analysis(
     try:
         # Step 2: Fetch GitHub Profile & Repositories
         profile = await gh_service.get_user_profile(username)
-        repos = await gh_service.get_user_repositories(username, max_repos=15)
+        repos = await gh_service.get_user_repositories(username, max_repos=100)
     except GitHubUserNotFoundError:
         return {
             "is_available": False,
@@ -69,13 +69,30 @@ async def run_github_evidence_analysis(
             "enhanced_ats_score": original_ats_score,
         }
 
-    # Step 3: Fetch Readmes, Trees, Configs, Commits for top 5 repos safely
+    # Step 3: Match Resume Projects to Repositories
+    resume_projects = [p for p in parsed_resume.get("projects", []) if isinstance(p, dict)]
+    matched_repo_objs = []
+    project_matches_raw = []
+
+    for p in resume_projects:
+        ranked = match_project_to_repositories(p, repos, embedder)
+        if ranked:
+            top_repo, match_score, match_priority = ranked[0]
+            matched_repo_objs.append(top_repo)
+            project_matches_raw.append((p, top_repo, match_priority))
+        else:
+            project_matches_raw.append((p, None, "NONE"))
+
+    # Select target repos for detail fetching: matched repos + top 25 repos
+    target_repos_dict = {r["name"]: r for r in matched_repo_objs + repos[:25]}
+    target_repos = list(target_repos_dict.values())
+
     readmes = {}
     trees = {}
     configs = {}
     all_commits = []
 
-    for repo in repos[:5]:
+    for repo in target_repos:
         r_name = repo["name"]
         try:
             rm_text = await gh_service.get_repository_readme(username, r_name)
@@ -86,7 +103,7 @@ async def run_github_evidence_analysis(
 
             # Fetch key dependency configs
             repo_cfgs = {}
-            for path_cand in ["package.json", "requirements.txt", "pyproject.toml", "Dockerfile", "docker-compose.yml"]:
+            for path_cand in ["package.json", "requirements.txt", "pyproject.toml", "Dockerfile", "docker-compose.yml", "pom.xml"]:
                 matching = [f["path"] for f in tree if f["path"].lower() == path_cand or f["path"].lower().endswith(f"/{path_cand}")]
                 if matching:
                     cfg_content = await gh_service.get_file_content(username, r_name, matching[0])
@@ -101,14 +118,10 @@ async def run_github_evidence_analysis(
         except Exception as err:
             logger.warning(f"Skipping detail fetch for repo {r_name}: {err}")
 
-    # Step 4: Match Resume Projects to Repositories
-    resume_projects = [p for p in parsed_resume.get("projects", []) if isinstance(p, dict)]
+    # Step 4: Evaluate Project Evidence
     project_matches = []
-
-    for p in resume_projects:
-        ranked = match_project_to_repositories(p, repos, embedder)
-        if ranked:
-            top_repo, match_score, match_priority = ranked[0]
+    for p, top_repo, match_priority in project_matches_raw:
+        if top_repo:
             r_name = top_repo["name"]
             try:
                 langs = await gh_service.get_repository_languages(username, r_name)

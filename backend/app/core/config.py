@@ -57,8 +57,8 @@ class Settings(BaseSettings):
 
     # LLM (Groq API)
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-    GROQ_PRIMARY_MODEL: str = "openai/gpt-oss-20b"
-    GROQ_FAST_MODEL: str = "groq/compound-mini"
+    GROQ_PRIMARY_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_FAST_MODEL: str = "llama-3.1-8b-instant"
 
     # External APIs
     GNEWS_API_KEY: str = os.getenv("GNEWS_API_KEY", "")

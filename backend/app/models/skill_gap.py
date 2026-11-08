@@ -9,9 +9,11 @@ class SkillGapReport(SupabaseModel):
 
     user_id: str
     resume_id: str
+    ats_report_id: Optional[str] = None
     job_id: Optional[str] = None
     target_company: str
     target_role: str
+    job_description: Optional[str] = None
     match_percentage: float
     confidence_score: float = 0.0
     confidence_level: str = "Medium"
@@ -26,7 +28,7 @@ class SkillGapReport(SupabaseModel):
     company_dsa_problems: List[Dict[str, Any]] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    @field_validator("user_id", "resume_id", "job_id", mode="before")
+    @field_validator("user_id", "resume_id", "job_id", "ats_report_id", mode="before")
     @classmethod
     def convert_reference_id(cls, v: Any) -> Optional[str]:
         if v is None:

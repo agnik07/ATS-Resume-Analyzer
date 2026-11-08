@@ -38,3 +38,7 @@ export function getScoreStatusLabel(score) {
   if (score >= 40) return 'Needs Work';
   return 'Poor';
 }
+
+export const getScoreColor = getScoreColorClass;
+export const getScoreBg = getScoreBgClass;
+

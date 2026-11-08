@@ -61,10 +61,11 @@ def _call_groq(system_prompt: str, user_prompt: str, model: Optional[str] = None
 
     models_to_try = [
         model or settings.GROQ_PRIMARY_MODEL,
-        "openai/gpt-oss-20b",
-        "groq/compound-mini",
-        "qwen/qwen3.6-27b",
-        "groq/compound",
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "llama3-70b-8192",
+        "llama3-8b-8192",
+        "gemma2-9b-it",
     ]
 
     seen = set()
@@ -177,18 +178,23 @@ def _rule_based_resume_parser(raw_text: str) -> Dict[str, Any]:
     curr_proj = None
 
     for line in proj_lines:
-        if line.startswith(("•", "-", "*")) or (curr_proj and not ("|" in line or "–" in line or "-" in line) and len(line) > 35):
+        line_str = line.strip()
+        if not line_str:
+            continue
+        is_bullet = line_str.startswith(("•", "*")) or line_str.startswith(("- ", "– "))
+        is_continuation = curr_proj and not ("|" in line_str or "–" in line_str or " - " in line_str) and len(line_str) > 35
+        if is_bullet or is_continuation:
             if curr_proj:
-                bullet = line.lstrip("•-* ").strip()
+                bullet = line_str.lstrip("•-*– ").strip()
                 curr_proj["description"] = (curr_proj["description"] + " " + bullet).strip()
                 for sk in list(detected_skills):
                     if sk.lower() in bullet.lower() and sk not in curr_proj["technologies"]:
                         curr_proj["technologies"].append(sk)
         else:
-            title_clean = line.split("|")[0].split("–")[0].split("-")[0].strip()
+            title_clean = line_str.split("|")[0].split("–")[0].split(" - ")[0].strip()
             if len(title_clean) > 2:
                 repo_url = None
-                r_match = re.search(r"github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", line, re.IGNORECASE)
+                r_match = re.search(r"github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", line_str, re.IGNORECASE)
                 if r_match:
                     repo_url = f"https://{r_match.group(0)}"
 
@@ -445,6 +451,135 @@ def generate_candidate_interview_questions(
         "Describe your approach to code reviews, testing, and production deployment.",
         "Tell us about a time you had to balance technical debt with urgent product delivery.",
     ]
+
+
+def generate_candidate_intelligence_dossier(
+    candidate_name: str,
+    target_role: str,
+    job_description: str,
+    resume_text: str,
+    skills: List[str],
+    validated_skills: List[str],
+    missing_skills: List[str],
+    verified_projects: List[Dict[str, Any]],
+    github_evidence_score: float,
+    ats_score: float,
+    match_percentage: float,
+) -> Dict[str, Any]:
+    """
+    Generate comprehensive Recruiter Candidate Intelligence Dossier with Groq LLM:
+    - Why the candidate matches the job
+    - Strongest technical capabilities
+    - Missing requirements
+    - Potential concerns
+    - Relevant project evidence
+    - Tailored technical interview questions based on missing skills and candidate strengths.
+    Strictly preserves deterministic scores without modification or hallucination.
+    """
+    system_prompt = (
+        "You are an expert Executive Technical Recruiter and Engineering Hiring Evaluator. "
+        "Analyze the candidate's exact profile against the target job description. "
+        "CRITICAL RULES:\n"
+        "1. DO NOT invent or assume qualifications, skills, or projects not in the provided facts.\n"
+        "2. DO NOT alter, fabricate, or modify numerical scores.\n"
+        "3. Differentiate between verified technical evidence and unverified self-reported claims.\n"
+        "Return ONLY a clean JSON object without markdown code fences."
+    )
+
+    proj_summaries = []
+    for p in verified_projects[:4]:
+        title = p.get("title", "Project")
+        tech = ", ".join(p.get("technologies", []))
+        status = p.get("verification_status", "Resume Project")
+        proj_summaries.append(f"{title} ({status}; Tech: {tech})")
+
+    user_prompt = f"""Evaluate candidate: {candidate_name} for role: {target_role}
+Deterministic System Metrics:
+- ATS Overall Score: {ats_score}/100
+- Job Description Match: {match_percentage}%
+- GitHub Evidence Score: {github_evidence_score}/100
+
+Key Profile Data:
+- Matching & Validated Skills: {', '.join(validated_skills) if validated_skills else 'None verified'}
+- All Candidate Skills: {', '.join(skills[:15])}
+- Missing Job Requirements: {', '.join(missing_skills) if missing_skills else 'None identified'}
+- Technical Projects: {'; '.join(proj_summaries) if proj_summaries else 'No documented projects'}
+
+Job Description Excerpt:
+{job_description[:1200]}
+
+Candidate Resume Excerpt:
+{resume_text[:1500]}
+
+Respond with strictly valid JSON:
+{{
+  "match_rationale": "2-3 sentences explaining specifically why the candidate matches the job description requirements.",
+  "strongest_capabilities": ["Top 3 validated technical capabilities backed by project or skill evidence"],
+  "missing_requirements": ["Specific missing skills, tools, or experience required by the job"],
+  "potential_concerns": ["1-2 realistic risks, unverified skills, or areas requiring live verification"],
+  "project_evidence_analysis": "2 sentences evaluating candidate's project portfolio and code authenticity.",
+  "executive_summary": "Concise 3-4 sentence comprehensive evaluation for the hiring committee.",
+  "technical_interview_questions": [
+    "Technical question 1 probing their strongest verified skill or architectural design",
+    "Technical question 2 targeting a missing or unverified skill requirement",
+    "Technical question 3 exploring real-world implementation of their top project",
+    "Technical question 4 on debugging, scalability, or code reliability",
+    "Technical question 5 on domain-specific trade-offs relevant to the job"
+  ]
+}}"""
+
+    raw_response = _call_groq(system_prompt, user_prompt)
+    if raw_response:
+        parsed = _try_parse_json(raw_response)
+        if parsed and isinstance(parsed, dict) and "executive_summary" in parsed:
+            # Ensure required keys exist
+            return {
+                "match_rationale": parsed.get("match_rationale", f"{candidate_name} exhibits strong alignment with {target_role}."),
+                "strongest_capabilities": parsed.get("strongest_capabilities", validated_skills[:3] or skills[:3]),
+                "missing_requirements": parsed.get("missing_requirements", missing_skills),
+                "potential_concerns": parsed.get("potential_concerns", [f"Verify hands-on depth in {missing_skills[0]}." if missing_skills else "Confirm production scale experience."]),
+                "project_evidence_analysis": parsed.get("project_evidence_analysis", f"Demonstrates practical implementation across {len(verified_projects)} projects."),
+                "executive_summary": parsed.get("executive_summary", ""),
+                "technical_interview_questions": parsed.get("technical_interview_questions", []),
+            }
+
+    # Deterministic fallback without LLM
+    strongest = validated_skills[:3] if validated_skills else skills[:3]
+    missing = missing_skills[:4] if missing_skills else ["Specific advanced domain tooling"]
+    q1 = f"Can you walk us through the system architecture and design decisions in your top project?"
+    q2 = f"How have you practically utilized {strongest[0] if strongest else 'your primary stack'} in a production or team environment?"
+    q3 = f"The job requires experience with {missing[0]}. How would you approach quickly ramping up and delivering with this technology?"
+    q4 = "How do you ensure test coverage, CI/CD pipeline reliability, and code review standards?"
+    q5 = "Describe an instance where you optimized application performance or resolved a complex latency bottleneck."
+
+    exec_summary = (
+        f"{candidate_name} demonstrates a {match_percentage:.0f}% alignment with the {target_role} role, "
+        f"supported by an ATS score of {ats_score:.0f}/100 and a GitHub evidence score of {github_evidence_score:.0f}/100. "
+        f"Core technical strengths include {', '.join(strongest)}. "
+        + (f"Key focus areas for evaluation include missing experience in {', '.join(missing)}." if missing else "Candidate meets all primary requirements.")
+    )
+
+    return {
+        "match_rationale": (
+            f"{candidate_name} satisfies {match_percentage:.0f}% of the required competencies for {target_role}, "
+            f"demonstrating verified hands-on foundation in {', '.join(strongest)}."
+        ),
+        "strongest_capabilities": [
+            f"Demonstrated proficiency in {s}" for s in strongest
+        ] or ["Solid technical baseline matching core role duties"],
+        "missing_requirements": [
+            f"Lacks explicit verification in {m}" for m in missing
+        ],
+        "potential_concerns": [
+            f"Requires technical validation for {missing[0]} during interview." if missing else "Validate scalability in enterprise workloads."
+        ],
+        "project_evidence_analysis": (
+            f"Candidate portfolio includes {len(verified_projects)} documented projects with "
+            f"{'public repository validation' if github_evidence_score > 30 else 'resume-referenced codebases'}."
+        ),
+        "executive_summary": exec_summary,
+        "technical_interview_questions": [q1, q2, q3, q4, q5],
+    }
 
 
 def generate_candidate_summary_and_questions(

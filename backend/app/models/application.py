@@ -20,6 +20,7 @@ class Application(SupabaseModel):
     student_id: str
     resume_id: str
     ats_report_id: Optional[str] = None
+    skill_gap_report_id: Optional[str] = None
     ats_score: float = 0.0
     match_percentage: float = 0.0
     status: ApplicationStatus = ApplicationStatus.APPLIED
@@ -30,7 +31,7 @@ class Application(SupabaseModel):
     applied_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    @field_validator("job_id", "student_id", "resume_id", "ats_report_id", mode="before")
+    @field_validator("job_id", "student_id", "resume_id", "ats_report_id", "skill_gap_report_id", mode="before")
     @classmethod
     def convert_reference_id(cls, v: Any) -> Optional[str]:
         if v is None:
@@ -38,3 +39,23 @@ class Application(SupabaseModel):
         if hasattr(v, "id"):
             return str(v.id)
         return str(v)
+
+
+class ApplicationAuditLog(SupabaseModel):
+    __table_name__: str = "application_audit_logs"
+
+    application_id: str
+    recruiter_id: str
+    job_id: str
+    previous_status: str
+    new_status: str
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @field_validator("application_id", "recruiter_id", "job_id", mode="before")
+    @classmethod
+    def convert_reference_id(cls, v: Any) -> str:
+        if hasattr(v, "id"):
+            return str(v.id)
+        return str(v) if v is not None else ""
+

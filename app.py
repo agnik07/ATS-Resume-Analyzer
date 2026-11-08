@@ -2,10 +2,16 @@ import os
 import sys
 from pathlib import Path
 
-# Add backend directory to Python module search path
+# Add backend directory to Python module search path and remove root to prevent collision
 ROOT_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = ROOT_DIR / "backend"
+while str(ROOT_DIR) in sys.path:
+    sys.path.remove(str(ROOT_DIR))
+while "" in sys.path:
+    sys.path.remove("")
 sys.path.insert(0, str(BACKEND_DIR))
+if "app" in sys.modules:
+    del sys.modules["app"]
 
 import gradio as gr
 from app.main import app as fastapi_app

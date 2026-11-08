@@ -104,7 +104,7 @@ class GitHubService:
             "blog": data.get("blog"),
         }
 
-    async def get_user_repositories(self, username: str, max_repos: int = 30) -> List[Dict[str, Any]]:
+    async def get_user_repositories(self, username: str, max_repos: int = 100) -> List[Dict[str, Any]]:
         """Fetch public repositories sorted by updated date."""
         params = {"sort": "updated", "direction": "desc", "per_page": min(max_repos, 100)}
         repos_raw = await self._make_request(f"users/{username}/repos", params=params)

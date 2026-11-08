@@ -29,11 +29,18 @@ class ATSReport(SupabaseModel):
     github_evidence_score: Optional[float] = 0.0
     enhanced_ats_score: Optional[float] = 0.0
     github_evidence: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    target_company: Optional[str] = None
+    target_role: Optional[str] = None
+    job_description: Optional[str] = None
+    job_id: Optional[str] = None
+    skill_gap_report_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    @field_validator("user_id", "resume_id", mode="before")
+    @field_validator("user_id", "resume_id", "job_id", "skill_gap_report_id", mode="before")
     @classmethod
-    def convert_reference_id(cls, v: Any) -> str:
+    def convert_reference_id(cls, v: Any) -> Optional[str]:
+        if v is None:
+            return None
         if hasattr(v, "id"):
             return str(v.id)
         return str(v) if v is not None else ""

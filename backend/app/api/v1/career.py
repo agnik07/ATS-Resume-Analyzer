@@ -1,8 +1,11 @@
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.models.career_test import CareerTestResult
+from app.models.progress import UserDSAProgress
 from app.schemas.career import (
     CareerTestQuestion,
     CareerTestResultResponse,
@@ -13,8 +16,10 @@ from app.services.dsa_service import (
     get_dsa_companies,
     get_dsa_problems,
     get_company_dsa_bank,
+    get_dsa_topics,
+    get_recommended_dsa_problems,
 )
-from app.services.news_service import get_job_news
+from app.services.news_service import NEWS_CATEGORIES, get_job_news
 
 router = APIRouter(prefix="/career", tags=["Career Intelligence & Prep"])
 
@@ -135,25 +140,41 @@ async def get_my_career_test_results(current_user: User = Depends(get_current_us
     ]
 
 
-# --- DSA Tracker Endpoints ---
+# --- DSA Tracker & Progress Endpoints ---
+class DSAProgressUpdateRequest(BaseModel):
+    problem_id: str
+    is_solved: bool = True
+    problem_title: Optional[str] = None
+    company: Optional[str] = None
+    difficulty: Optional[str] = None
+
+
 @router.get("/dsa/companies")
 async def list_dsa_companies():
     """List all companies available in master DSA problem bank."""
     return get_dsa_companies()
 
 
+@router.get("/dsa/topics")
+async def list_dsa_topics():
+    """List all data structure topics with problem counts."""
+    return get_dsa_topics()
+
+
 @router.get("/dsa/problems")
 async def list_dsa_problems(
     company: Optional[str] = Query(None),
     difficulty: Optional[str] = Query(None),
+    topic: Optional[str] = Query(None),
     query: Optional[str] = Query(None),
     limit: int = Query(200, le=1000),
     skip: int = Query(0, ge=0),
 ):
-    """Query problems with company, difficulty, keyword search, and pagination."""
+    """Query problems with company, difficulty, topic, keyword search, and pagination."""
     return get_dsa_problems(
         company=company,
         difficulty=difficulty,
+        topic=topic,
         query=query,
         limit=limit,
         skip=skip,
@@ -166,6 +187,97 @@ async def get_company_dsa_problems(company_name: str, limit: int = Query(15, le=
     return get_company_dsa_bank(company_name=company_name, limit=limit)
 
 
+@router.get("/dsa/recommended")
+async def get_target_aware_dsa(
+    company: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+    missing_skills: Optional[str] = Query(None),
+    limit: int = Query(15, le=50),
+):
+    """
+    Target-aware DSA recommendation engine:
+    Connects target company, target role, and missing technical skills to tailored problem sets.
+    """
+    skills_list = [s.strip() for s in missing_skills.split(",") if s.strip()] if missing_skills else None
+    return get_recommended_dsa_problems(
+        target_company=company,
+        target_role=role,
+        missing_skills=skills_list,
+        limit=limit,
+    )
+
+
+@router.get("/dsa/progress")
+async def get_dsa_progress(current_user: User = Depends(get_current_user)):
+    """Retrieve user's persistent DSA solved problems and statistical metrics from Supabase."""
+    uid = str(current_user.id)
+    records = await UserDSAProgress.find(user_id=uid).to_list()
+
+    solved_records = [r for r in records if r.is_solved]
+    solved_ids = [r.problem_id for r in solved_records]
+
+    easy_count = sum(1 for r in solved_records if (r.difficulty or "").lower() == "easy")
+    medium_count = sum(1 for r in solved_records if (r.difficulty or "").lower() == "medium")
+    hard_count = sum(1 for r in solved_records if (r.difficulty or "").lower() == "hard")
+
+    by_company: Dict[str, int] = {}
+    for r in solved_records:
+        if r.company:
+            comp_norm = r.company.lower().strip()
+            by_company[comp_norm] = by_company.get(comp_norm, 0) + 1
+
+    return {
+        "solved_ids": solved_ids,
+        "total_solved": len(solved_ids),
+        "easy_solved": easy_count,
+        "medium_solved": medium_count,
+        "hard_solved": hard_count,
+        "by_company": by_company,
+    }
+
+
+@router.post("/dsa/progress")
+async def update_dsa_progress(
+    req: DSAProgressUpdateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Persist student problem completion state in Supabase."""
+    uid = str(current_user.id)
+    existing = await UserDSAProgress.find_one(
+        UserDSAProgress.user_id == uid,
+        UserDSAProgress.problem_id == req.problem_id,
+    )
+
+    if existing:
+        existing.is_solved = req.is_solved
+        if req.problem_title:
+            existing.problem_title = req.problem_title
+        if req.difficulty:
+            existing.difficulty = req.difficulty
+        if req.company:
+            existing.company = req.company
+        existing.solved_at = datetime.now(timezone.utc)
+        await existing.save()
+        record_id = str(existing.id)
+    else:
+        new_record = UserDSAProgress(
+            user_id=uid,
+            problem_id=req.problem_id,
+            problem_title=req.problem_title,
+            company=req.company,
+            difficulty=req.difficulty,
+            is_solved=req.is_solved,
+        )
+        await new_record.insert()
+        record_id = str(new_record.id)
+
+    return {
+        "message": f"Problem {req.problem_id} progress persisted successfully",
+        "record_id": record_id,
+        "is_solved": req.is_solved,
+    }
+
+
 @router.get("/dsa/all")
 async def list_all_dsa():
     """Get all DSA problems."""
@@ -174,7 +286,35 @@ async def list_all_dsa():
 
 # --- Tech Hiring News ---
 @router.get("/news")
-async def get_tech_news(count: int = Query(10, le=30)):
-    """Get live job market and recruitment news."""
-    articles = await get_job_news(count=count)
-    return {"articles": articles}
+async def get_tech_news(
+    count: int = Query(25, le=50),
+    category: Optional[str] = Query(None),
+    company: Optional[str] = Query(None),
+    query: Optional[str] = Query(None),
+    sort_by: str = Query("latest", pattern="^(latest|relevant)$"),
+):
+    """
+    Get live job market and recruitment news magazine feed.
+    Enriched with real images, category classification, key takeaways, and featured stories.
+    """
+    # Sanitize inputs in case function is called directly in Python tests
+    count_val = count if isinstance(count, int) else 25
+    category_val = category if isinstance(category, str) and category.strip() else None
+    company_val = company if isinstance(company, str) and company.strip() else None
+    query_val = query if isinstance(query, str) and query.strip() else None
+    sort_by_val = sort_by if isinstance(sort_by, str) and sort_by in ("latest", "relevant") else "latest"
+
+    articles = await get_job_news(
+        count=count_val,
+        category=category_val,
+        company=company_val,
+        query=query_val,
+        sort_by=sort_by_val,
+    )
+    featured = [a for a in articles if a.get("is_featured")]
+    return {
+        "articles": articles,
+        "featured": featured[:3] if featured else articles[:2],
+        "categories": NEWS_CATEGORIES,
+        "total": len(articles),
+    }

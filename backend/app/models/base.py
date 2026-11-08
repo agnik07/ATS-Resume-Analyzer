@@ -356,27 +356,28 @@ class SupabaseModel(BaseModel, metaclass=ModelMeta):
 
         client = get_supabase_client()
         if client:
-            try:
-                res = client.table(table_name).insert(data).execute()
-                if res.data and len(res.data) > 0:
-                    row = res.data[0]
-                    self.id = str(row.get("id", self.id))
-            except Exception as e:
-                err_msg = str(e)
-                logger.warning(f"Supabase insert warning on {table_name}: {err_msg}")
-                # Retry stripping unmapped column if schema cache lacks new fields (PGRST204)
-                if "PGRST204" in err_msg or "Could not find the" in err_msg:
-                    try:
+            clean_data = dict(data)
+            max_retries = 15
+            for _ in range(max_retries):
+                try:
+                    res = client.table(table_name).insert(clean_data).execute()
+                    if res.data and len(res.data) > 0:
+                        row = res.data[0]
+                        self.id = str(row.get("id", self.id))
+                    break
+                except Exception as e:
+                    err_msg = str(e)
+                    if "PGRST204" in err_msg or "Could not find the" in err_msg:
                         import re
                         m = re.search(r"Could not find the '([^']+)' column", err_msg)
                         if m:
                             missing_col = m.group(1)
-                            clean_data = {k: v for k, v in data.items() if k != missing_col}
-                            res = client.table(table_name).insert(clean_data).execute()
-                            if res.data and len(res.data) > 0:
-                                self.id = str(res.data[0].get("id", self.id))
-                    except Exception as retry_err:
-                        logger.error(f"Supabase retry insert error on {table_name}: {retry_err}")
+                            if missing_col in clean_data:
+                                logger.warning(f"Supabase insert: column '{missing_col}' missing from table '{table_name}', stripping and retrying")
+                                del clean_data[missing_col]
+                                continue
+                    logger.error(f"Supabase insert error on {table_name}: {e}")
+                    break
 
         _in_memory_db.setdefault(table_name, {})[str(self.id)] = data
         return self
@@ -392,26 +393,28 @@ class SupabaseModel(BaseModel, metaclass=ModelMeta):
 
         client = get_supabase_client()
         if client:
-            try:
-                res = client.table(table_name).upsert(data).execute()
-                if res.data and len(res.data) > 0:
-                    row = res.data[0]
-                    self.id = str(row.get("id", self.id))
-            except Exception as e:
-                err_msg = str(e)
-                logger.warning(f"Supabase upsert warning on {table_name}: {err_msg}")
-                if "PGRST204" in err_msg or "Could not find the" in err_msg:
-                    try:
+            clean_data = dict(data)
+            max_retries = 15
+            for _ in range(max_retries):
+                try:
+                    res = client.table(table_name).upsert(clean_data).execute()
+                    if res.data and len(res.data) > 0:
+                        row = res.data[0]
+                        self.id = str(row.get("id", self.id))
+                    break
+                except Exception as e:
+                    err_msg = str(e)
+                    if "PGRST204" in err_msg or "Could not find the" in err_msg:
                         import re
                         m = re.search(r"Could not find the '([^']+)' column", err_msg)
                         if m:
                             missing_col = m.group(1)
-                            clean_data = {k: v for k, v in data.items() if k != missing_col}
-                            res = client.table(table_name).upsert(clean_data).execute()
-                            if res.data and len(res.data) > 0:
-                                self.id = str(res.data[0].get("id", self.id))
-                    except Exception as retry_err:
-                        logger.error(f"Supabase retry upsert error on {table_name}: {retry_err}")
+                            if missing_col in clean_data:
+                                logger.warning(f"Supabase upsert: column '{missing_col}' missing from table '{table_name}', stripping and retrying")
+                                del clean_data[missing_col]
+                                continue
+                    logger.error(f"Supabase upsert error on {table_name}: {e}")
+                    break
 
         _in_memory_db.setdefault(table_name, {})[str(self.id)] = data
         return self

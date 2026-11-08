@@ -54,6 +54,25 @@ async def get_current_user(
     return user
 
 
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Optional[User]:
+    """Return User if valid token is provided, else None without raising error."""
+    if not credentials or not credentials.credentials:
+        return None
+    try:
+        payload = decode_token(credentials.credentials, is_refresh=False)
+        user_id = payload.get("sub")
+        token_type = payload.get("type")
+        if user_id and token_type == "access":
+            user = await User.get(user_id)
+            if user and user.is_active:
+                return user
+    except Exception:
+        return None
+    return None
+
+
 def require_role(allowed_roles: list[UserRole]):
     """Decorator factory enforcing Role-Based Access Control."""
     async def role_checker(current_user: User = Depends(get_current_user)) -> User:

@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-import { getScoreColorClass, getScoreBgClass } from '../../lib/scoreUtils';
+import { getScoreColorClass, getScoreBgClass, getScoreColor, getScoreBg } from '../../lib/scoreUtils';
 
 export default function GitHubEvidenceDashboard({ githubEvidence, enhancedAtsScore, originalAtsScore }) {
   const [activeTab, setActiveTab] = useState('overview');

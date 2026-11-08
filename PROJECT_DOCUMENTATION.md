@@ -317,11 +317,17 @@ All API endpoints are mounted under the `/api/v1` prefix.
 | **GitHub** | `POST` | `/api/v1/github/analyze-evidence` | Yes | Execute deep-code GitHub cross-validation |
 | **Jobs** | `GET` | `/api/v1/jobs` | Yes | Browse active job listings with search/filters |
 | **Jobs** | `POST` | `/api/v1/jobs/{id}/apply` | Yes (Student) | Submit application with verified ATS score |
-| **Recruiter** | `GET` | `/api/v1/recruiter/dashboard` | Yes (Recruiter) | Recruiter portal metrics & pipeline statistics |
+| **Recruiter** | `GET` | `/api/v1/recruiter/dashboard` | Yes (Recruiter) | Comprehensive recruiter intelligence metrics, KPI distribution & application trends |
+| **Recruiter** | `GET` | `/api/v1/recruiter/stats` | Yes (Recruiter) | Aggregate recruiter dashboard statistics & job-wise analytics |
 | **Recruiter** | `POST` | `/api/v1/recruiter/jobs` | Yes (Recruiter) | Create job opening with minimum ATS score threshold |
-| **Recruiter** | `GET` | `/api/v1/recruiter/jobs/{id}/candidates` | Yes (Recruiter) | Get candidate pipeline ranked by ATS score |
-| **Recruiter** | `POST` | `/api/v1/recruiter/applications/{id}/ai-summary` | Yes (Recruiter) | Generate Groq AI summary & interview questions |
-| **Recruiter** | `PATCH` | `/api/v1/recruiter/applications/{id}/status` | Yes (Recruiter) | Update candidate hiring pipeline status |
+| **Recruiter** | `GET` | `/api/v1/recruiter/jobs/{id}/candidates` | Yes (Recruiter) | Candidate pipeline sorted by ATS, JD match, GitHub evidence, or date |
+| **Recruiter** | `GET` | `/api/v1/recruiter/applications/{id}` | Yes (Recruiter) | Detailed candidate evaluation dossier (Sections A, B, C, D, E) |
+| **Recruiter** | `GET` | `/api/v1/recruiter/applications/{id}/resume` | Yes (Recruiter) | Authorized secure resume document streaming / preview |
+| **Recruiter** | `GET` | `/api/v1/recruiter/applications/{id}/audit-logs` | Yes (Recruiter) | Audit trail of hiring pipeline status decisions |
+| **Recruiter** | `POST` | `/api/v1/recruiter/applications/{id}/ai-summary` | Yes (Recruiter) | Groq AI candidate intelligence summary & tailored interview questions |
+| **Recruiter** | `POST` | `/api/v1/recruiter/applications/{id}/ai-questions` | Yes (Recruiter) | Generate role-specific technical interview questions |
+| **Recruiter** | `PATCH` | `/api/v1/recruiter/applications/{id}/status` | Yes (Recruiter) | Update candidate hiring pipeline status with audit logging |
+| **Recruiter** | `POST` | `/api/v1/recruiter/jobs/{id}/compare` | Yes (Recruiter) | Side-by-side comparison matrix for 2-5 candidates |
 | **Career** | `GET` | `/api/v1/career/test/questions` | Yes | Get psychometric career test questions |
 | **Career** | `POST` | `/api/v1/career/test/submit` | Yes | Evaluate test answers & predict career path |
 | **Career** | `GET` | `/api/v1/career/dsa/all` | Yes | Fetch LeetCode/DSA problem tracker data |
@@ -406,6 +412,10 @@ SUPABASE_KEY="your-supabase-anon-key"
 # Groq API Key
 GROQ_API_KEY="gsk_your_groq_api_key"
 
+# Optional External Data APIs
+GNEWS_API_KEY="your_gnews_api_key"
+YOUTUBE_API_KEY="your_youtube_api_key"
+
 # JWT Authentication
 JWT_SECRET_KEY="your-super-secret-jwt-key"
 ACCESS_TOKEN_EXPIRE_MINUTES=60
@@ -420,7 +430,14 @@ Create `frontend/.env`:
 VITE_BACKEND_URL="http://localhost:8000"
 ```
 
-### 3. Run Application
+### 3. Database Migrations (Supabase PostgreSQL)
+
+Apply the versioned SQL migrations in order located in `backend/migrations/`:
+1. `backend/migrations/001_initial_schema.sql`: Core tables, indexes, and base foreign keys.
+2. `backend/migrations/002_evidence_and_applications.sql`: GitHub evidence tables, application audit logs, and unique constraints.
+3. `backend/migrations/003_phase6_final_unified_schema.sql`: Progress persistence (`user_roadmap_progress`, `user_dsa_progress`), cross-module references, and Row Level Security.
+
+### 4. Run Application
 
 #### Option A: Single Command Startup
 ```bash
@@ -440,10 +457,19 @@ npm run dev
 - **Backend API**: `http://localhost:8000`
 - **Swagger API Docs**: `http://localhost:8000/docs`
 
-#### Option C: Running Unit Tests
+#### Option C: Running the Full Automated Test Suite
 ```bash
-PYTHONPATH=backend .venv/bin/pytest backend/tests -v
+.venv/bin/pytest backend/tests -v
 ```
+
+---
+
+## 🏆 Phase 6 Deliverables Summary
+
+- **Redesigned Student Dashboard**: Centralized 4-module hub (Career Readiness, Jobs, DSA Tracker, Hiring Intelligence) with Recharts visualizations, 5-pillar ATS breakdown, and progress tracking.
+- **Enterprise-Grade Role-Based Navigation**: Distinct student, recruiter, and admin portals with route guards and mobile-responsive drawer.
+- **Unified Cross-Module Integration**: Seamless data propagation between ATS scans, skill gaps, learning roadmaps, company DSA problems, job applications, and recruiter candidate dossiers.
+- **End-to-End Test Suite**: 54 comprehensive unit and integration tests passing across all real-world scenarios.
 
 ---
 

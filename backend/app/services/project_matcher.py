@@ -7,6 +7,23 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+def _extract_core_title(title: str) -> str:
+    """Extract primary project title before delimiters like –, —, -, :, |."""
+    if not title:
+        return ""
+    for sep in ["–", "—", "-", ":", "|"]:
+        if sep in title:
+            return title.split(sep)[0].strip()
+    return title.strip()
+
+
+def _clean_alphanumeric(text: str) -> str:
+    """Strip all non-alphanumeric characters and lowercase."""
+    if not text:
+        return ""
+    return re.sub(r"[^\w]", "", text.lower())
+
+
 def _normalize_name(name: str) -> str:
     """Normalize string by lowercasing, stripping punctuation, hyphens, underscores, and extra spaces."""
     if not name:
@@ -44,8 +61,8 @@ def match_project_to_repositories(
     """
     Match candidate repositories with strict priority enforcement:
     Priority 1: Explicit GitHub URL match
-    Priority 2: Exact name match (or normalized name match)
-    Priority 3: Fuzzy name match
+    Priority 2: Exact or Core Name match (normalized alphanumeric)
+    Priority 3: Fuzzy name & token set match
     Priority 4: Semantic description / README match
     Priority 5: Technology overlap match
     """
@@ -54,6 +71,9 @@ def match_project_to_repositories(
     p_url = resume_project.get("github_url") or ""
     p_techs = [t.lower() for t in resume_project.get("technologies", []) if t]
 
+    core_title = _extract_core_title(p_name)
+    core_alpha = _clean_alphanumeric(core_title)
+    full_alpha = _clean_alphanumeric(p_name)
     norm_p_name = _normalize_name(p_name)
 
     ranked = []
@@ -64,6 +84,7 @@ def match_project_to_repositories(
         r_lang = (repo.get("language") or "").lower()
         r_topics = [t.lower() for t in repo.get("topics", [])]
 
+        r_alpha = _clean_alphanumeric(r_name)
         norm_r_name = _normalize_name(r_name)
 
         # Priority 1: Explicit URL Match
@@ -71,8 +92,17 @@ def match_project_to_repositories(
             ranked.append((repo, 100.0, "EXPLICIT_URL"))
             continue
 
-        # Priority 2: Exact Name Match
-        if p_name.lower() == r_name.lower() or norm_p_name == norm_r_name or r_name.lower() in p_name.lower().replace(" ", ""):
+        # Priority 2: Exact Name or Core Name Alphanumeric Match
+        if (
+            p_name.lower() == r_name.lower()
+            or core_title.lower() == r_name.lower()
+            or (core_alpha and core_alpha == r_alpha)
+            or (full_alpha and full_alpha == r_alpha)
+        ):
+            ranked.append((repo, 98.0, "EXACT_NAME"))
+            continue
+
+        if core_alpha and r_alpha and (core_alpha in r_alpha or r_alpha in core_alpha) and len(r_alpha) >= 4:
             ranked.append((repo, 95.0, "EXACT_NAME"))
             continue
 
@@ -81,6 +111,7 @@ def match_project_to_repositories(
             fuzz.ratio(p_name.lower(), r_name.lower()),
             fuzz.partial_ratio(p_name.lower(), r_name.lower()),
             fuzz.token_set_ratio(p_name.lower(), r_name.lower()),
+            fuzz.token_set_ratio(core_title.lower(), r_name.lower()),
             fuzz.token_set_ratio(norm_p_name, norm_r_name),
         )
 

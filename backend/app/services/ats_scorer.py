@@ -2,7 +2,7 @@ import re
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
-from app.services.skill_taxonomy import fuzzy_match_keywords, normalize_skill
+from app.services.skill_taxonomy import fuzzy_match_keywords, normalize_skill, expand_skill_variants
 
 logger = logging.getLogger(__name__)
 
@@ -80,10 +80,11 @@ def validate_skills_with_projects(
     projects: List[Dict],
     experience_entries: List[Dict],
     embedder: Optional[Any],
-    threshold: float = 0.55,
+    threshold: float = 0.42,
+    raw_resume_text: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Deterministically validate claimed skills against project descriptions and work history.
+    Deterministically validate claimed skills against project descriptions, work history, and raw resume text.
     """
     if not skills:
         return {
@@ -100,6 +101,8 @@ def validate_skills_with_projects(
         if isinstance(e, dict)
     ).strip()
 
+    raw_text_lower = (raw_resume_text or "").lower()
+
     validated_skills = []
     unvalidated_skills = []
     skill_project_mapping = {}
@@ -109,24 +112,10 @@ def validate_skills_with_projects(
         matching_projects = []
         max_similarity = 0.0
 
-        skill_lower = skill.lower()
-
-        # Build list of search variants for skill (e.g., node.js -> node, js -> javascript, etl -> etl pipeline)
-        search_variants = {skill_lower, raw_skill.lower()}
-        if skill_lower in {"node.js", "nodejs"}:
-            search_variants.update({"node.js", "node", "express"})
-        elif skill_lower in {"react", "react.js"}:
-            search_variants.update({"react", "react.js", "reactjs"})
-        elif skill_lower in {"fastapi"}:
-            search_variants.update({"fastapi", "fast api"})
-        elif skill_lower in {"oop", "object-oriented programming"}:
-            search_variants.update({"oop", "object-oriented", "object oriented"})
-        elif skill_lower in {"nlp", "natural language processing"}:
-            search_variants.update({"nlp", "natural language", "llm", "llms"})
-        elif skill_lower in {"etl"}:
-            search_variants.update({"etl", "data migration", "pipeline", "pipelines"})
-        elif skill_lower in {"dsa", "data structures", "algorithms"}:
-            search_variants.update({"data structures", "algorithms", "dsa", "leetcode"})
+        # Build list of search variants for skill using taxonomy expander
+        search_variants = set(expand_skill_variants(raw_skill))
+        search_variants.add(skill.lower())
+        search_variants.add(raw_skill.lower())
 
         # Check projects
         for proj in projects:
@@ -135,7 +124,7 @@ def validate_skills_with_projects(
             proj_title = proj.get("title", "Project")
             proj_desc = f"{proj.get('title', '')} {proj.get('description', '')} {' '.join(proj.get('technologies', []))}".lower()
 
-            if any(v in proj_desc for v in search_variants):
+            if any(v in proj_desc for v in search_variants if len(v) >= 2):
                 matching_projects.append(proj_title)
                 max_similarity = 1.0
             elif embedder:
@@ -147,7 +136,7 @@ def validate_skills_with_projects(
         # Check experience
         if exp_text:
             exp_text_lower = exp_text.lower()
-            if any(v in exp_text_lower for v in search_variants):
+            if any(v in exp_text_lower for v in search_variants if len(v) >= 2):
                 if "Work Experience" not in matching_projects:
                     matching_projects.append("Work Experience")
                 max_similarity = max(max_similarity, 1.0)
@@ -158,16 +147,30 @@ def validate_skills_with_projects(
                         matching_projects.append("Work Experience")
                     max_similarity = max(max_similarity, sim)
 
+        # Check raw resume text fallback (e.g., bullet points or summary text)
+        if not matching_projects and raw_text_lower:
+            if any(v in raw_text_lower for v in search_variants if len(v) >= 2):
+                matching_projects.append("Resume Document")
+                max_similarity = max(max_similarity, 0.90)
+
+        # Non-verifiable soft skills or conceptual CS fundamentals
+        if not matching_projects:
+            from app.services.skill_verifier import classify_skill_type
+            s_type = classify_skill_type(skill)
+            if s_type in ("NON_GITHUB_VERIFIABLE", "CONCEPTUAL"):
+                matching_projects.append("Core CS / Professional Benchmark")
+                max_similarity = max(max_similarity, 0.85)
+
         if matching_projects:
             validated_skills.append({
-                "skill": skill,
+                "skill": raw_skill,
                 "projects": matching_projects,
                 "similarity": round(max_similarity, 2),
             })
-            skill_project_mapping[skill] = matching_projects
+            skill_project_mapping[raw_skill] = matching_projects
         else:
-            unvalidated_skills.append(skill)
-            skill_project_mapping[skill] = []
+            unvalidated_skills.append(raw_skill)
+            skill_project_mapping[raw_skill] = []
 
     validation_percentage = len(validated_skills) / len(skills) if skills else 0.0
     validation_score = validation_percentage * 15.0

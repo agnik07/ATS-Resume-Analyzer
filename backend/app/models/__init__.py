@@ -5,9 +5,10 @@ from app.models.resume import Resume
 from app.models.ats_report import ATSReport
 from app.models.company import Company
 from app.models.job import Job
-from app.models.application import Application, ApplicationStatus
+from app.models.application import Application, ApplicationStatus, ApplicationAuditLog
 from app.models.skill_gap import SkillGapReport
 from app.models.career_test import CareerTestResult
+from app.models.progress import UserRoadmapProgress, UserDSAProgress
 
 
 def get_link_id(link: Any) -> str:
@@ -31,7 +32,10 @@ __all__ = [
     "Job",
     "Application",
     "ApplicationStatus",
+    "ApplicationAuditLog",
     "SkillGapReport",
     "CareerTestResult",
+    "UserRoadmapProgress",
+    "UserDSAProgress",
     "get_link_id",
 ]
